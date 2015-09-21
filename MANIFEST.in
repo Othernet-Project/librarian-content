@@ -1,0 +1,2 @@
+recursive-include librarian_content *
+recursive-exclude tests *
