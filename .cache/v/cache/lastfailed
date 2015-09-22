@@ -1,0 +1,3 @@
+{
+  "tests/library/backends/embedded/test_embedded_archive.py::test__write": true
+}

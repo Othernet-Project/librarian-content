@@ -162,7 +162,7 @@ class EmbeddedArchive(BaseArchive):
 
     def get_count(self, terms=None, tag=None, lang=None, content_type=None):
         q = self.db.Select('COUNT(*) as count',
-                           sets='zipballs',
+                           sets='content',
                            where='disabled = 0')
         self._query(q, terms, tag, lang, content_type)
         return self.db.result.count
@@ -170,7 +170,7 @@ class EmbeddedArchive(BaseArchive):
     def get_content(self, terms=None, offset=0, limit=0, tag=None, lang=None,
                     content_type=None):
         # TODO: tests
-        q = self.db.Select(sets='zipballs',
+        q = self.db.Select(sets='content',
                            where='disabled = 0',
                            order=CONTENT_ORDER,
                            limit=limit,
@@ -179,41 +179,41 @@ class EmbeddedArchive(BaseArchive):
         results = self.many()
         if results and content_type in self.prefetchable_types:
             for meta in results:
-                self._fetch(content_type, meta['md5'], meta)
+                self._fetch(content_type, meta['path'], meta)
 
         return results
 
-    def _fetch(self, table, content_id, dest, many=False):
-        q = self.db.Select(sets=table, where='md5 = ?')
-        self.db.query(q, content_id)
+    def _fetch(self, table, relpath, dest, many=False):
+        q = self.db.Select(sets=table, where='path = ?')
+        self.db.query(q, relpath)
         dest[table] = self.one() if not many else self.many()
         for relation, related_tables in self.content_schema[table].items():
             for rel_table in related_tables:
                 self._fetch(rel_table,
-                            content_id,
+                            relpath,
                             dest[table],
                             many=relation == 'many')
 
-    def get_single(self, content_id):
-        q = self.db.Select(sets='zipballs', where='md5 = ?')
-        self.db.query(q, content_id)
+    def get_single(self, relpath):
+        q = self.db.Select(sets='content', where='path = ?')
+        self.db.query(q, relpath)
         data = self.one()
         if data:
             for content_type, mask in metadata.CONTENT_TYPES.items():
                 if data['content_type'] & mask == mask:
-                    self._fetch(content_type, content_id, data)
+                    self._fetch(content_type, relpath, data)
         return data
 
-    def get_multiple(self, content_ids, fields=None):
+    def get_multiple(self, relpaths, fields=None):
         q = self.db.Select(what=['*'] if fields is None else fields,
-                           sets='zipballs',
-                           where=self.sqlin('md5', content_ids))
-        self.db.query(q, *content_ids)
+                           sets='content',
+                           where=self.sqlin('path', relpaths))
+        self.db.query(q, *relpaths)
         return self.many()
 
     def content_for_domain(self, domain):
         # TODO: tests
-        q = self.db.Select(sets='zipballs',
+        q = self.db.Select(sets='content',
                            where='url LIKE :domain AND disabled = 0',
                            order=CONTENT_ORDER)
         domain = '%' + domain.lower() + '%'
@@ -240,56 +240,56 @@ class EmbeddedArchive(BaseArchive):
             logging.debug("Adding new content to archive database")
             replaces = metadata.get('replaces')
             self._serialize(metadata, self.transformations)
-            self._write('zipballs',
+            self._write('content',
                         metadata,
-                        shared_data={'md5': metadata['md5']})
+                        shared_data={'path': metadata['path']})
             if replaces:
                 msg = "Removing replaced content from archive database."
                 logging.debug(msg)
-                q = self.db.Delete('zipballs', where='md5 = ?')
+                q = self.db.Delete('content', where='path = ?')
                 self.db.query(q, replaces)
 
         return True
 
-    def remove_meta_from_db(self, content_id):
+    def remove_meta_from_db(self, relpath):
         with self.db.transaction() as cur:
-            msg = "Removing {0} from archive database".format(content_id)
+            msg = "Removing {0} from archive database".format(relpath)
             logging.debug(msg)
-            q = self.db.Delete('zipballs', where='md5 = ?')
-            self.db.query(q, content_id)
+            q = self.db.Delete('content', where='path = ?')
+            self.db.query(q, relpath)
             rowcount = cur.rowcount
-            q = self.db.Delete('taggings', where='md5 = ?')
-            self.db.query(q, content_id)
+            q = self.db.Delete('taggings', where='path = ?')
+            self.db.query(q, relpath)
             return rowcount
 
     def clear_and_reload(self):
         logging.debug('Content refill started.')
-        q = self.db.Delete('zipballs')
+        q = self.db.Delete('content')
         self.db.query(q)
         rows = self.reload_content()
         logging.info('Content refill finished for %s pieces of content', rows)
 
     def last_update(self):
-        """ Get timestamp of the last updated zipball
+        """ Get timestamp of the last updated content item
 
-        :returns:   datetime object of the last updated zipball
+        :returns:  datetime object of the last updated content item
         """
         q = self.db.Select('updated',
-                           sets='zipballs',
+                           sets='content',
                            order='-updated',
                            limit=1)
         self.db.query(q)
         res = self.one()
         return res and res.updated
 
-    def add_view(self, md5):
-        """ Increments the viewcount for zipball with specified MD5
+    def add_view(self, relpath):
+        """ Increments the viewcount for content with specified relpath
 
-        :param md5:     MD5 of the zipball
-        :returns:       ``True`` if successful, ``False`` otherwise
+        :param relpath:  Relative path of content item
+        :returns:        ``True`` if successful, ``False`` otherwise
         """
-        q = self.db.Update('zipballs', views='views + 1', where='md5 = ?')
-        self.db.query(q, md5)
+        q = self.db.Update('content', views='views + 1', where='path = ?')
+        self.db.query(q, relpath)
         assert self.db.cursor.rowcount == 1, 'Updated more than one row'
         return self.db.cursor.rowcount
 
@@ -310,14 +310,14 @@ class EmbeddedArchive(BaseArchive):
         ids = (i['tag_id'] for i in tags)
 
         # Create taggings
-        pairs = ({'md5': meta.md5, 'tag_id': i} for i in ids)
+        pairs = ({'path': meta.path, 'tag_id': i} for i in ids)
         tags_dict = {t['name']: t['tag_id'] for t in tags}
         meta.tags.update(tags_dict)
         with self.db.transaction():
-            q = self.db.Insert('taggings', cols=('tag_id', 'md5'))
+            q = self.db.Insert('taggings', cols=('tag_id', 'path'))
             self.db.executemany(q, pairs)
-            q = self.db.Update('zipballs', tags=':tags', where='md5 = :md5')
-            self.db.query(q, md5=meta.md5, tags=json.dumps(meta.tags))
+            q = self.db.Update('content', tags=':tags', where='path = :path')
+            self.db.query(q, path=meta.path, tags=json.dumps(meta.tags))
 
         return tags
 
@@ -331,11 +331,11 @@ class EmbeddedArchive(BaseArchive):
         meta.tags = dict((n, i) for n, i in meta.tags.items() if n not in tags)
         with self.db.transaction():
             q = self.db.Delete('taggings',
-                               where=['md5 = ?',
+                               where=['path = ?',
                                       self.sqlin('tag_id', tag_ids)])
-            self.db.query(q, meta.md5, *tag_ids)
-            q = self.db.Update('zipballs', tags=':tags', where='md5 = :md5')
-            self.db.query(q, md5=meta.md5, tags=json.dumps(meta.tags))
+            self.db.query(q, meta.path, *tag_ids)
+            q = self.db.Update('content', tags=':tags', where='path = :path')
+            self.db.query(q, path=meta.path, tags=json.dumps(meta.tags))
 
     def get_tag_name(self, tag_id):
         q = self.db.Select('name', sets='tags', where='tag_id = ?')
@@ -352,13 +352,13 @@ class EmbeddedArchive(BaseArchive):
         self.db.query(q)
         return self.many()
 
-    def needs_formatting(self, md5):
+    def needs_formatting(self, relpath):
         """ Whether content needs formatting patch """
-        q = self.db.Select('keep_formatting', sets='zipballs', where='md5 = ?')
-        self.db.query(q, md5)
+        q = self.db.Select('keep_formatting', sets='content', where='path = ?')
+        self.db.query(q, relpath)
         return not self.one()['keep_formatting']
 
     def get_content_languages(self):
-        q = 'SELECT DISTINCT language FROM zipballs'
+        q = 'SELECT DISTINCT language FROM content'
         self.db.query(q)
         return [row['language'] for row in self.many()]

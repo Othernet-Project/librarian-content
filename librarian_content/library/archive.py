@@ -16,7 +16,6 @@ import shutil
 
 from . import content
 from . import metadata
-from . import zipballs
 
 
 def is_string(obj):
@@ -25,14 +24,14 @@ def is_string(obj):
     return isinstance(obj, basestring)
 
 
-def content_id_list(func):
-    """In case a single content id string is passed to the function wrapped
-    with this decorator, the content id string will be wrapped in a list."""
+def to_list(func):
+    """In case a single string parameter is passed to the function wrapped
+    with this decorator, the single parameter will be wrapped in a list."""
     @functools.wraps(func)
-    def wrapper(self, content_ids):
-        if is_string(content_ids):
-            content_ids = [content_ids]
-        return func(self, content_ids)
+    def wrapper(self, arg):
+        if is_string(arg):
+            arg = [arg]
+        return func(self, arg)
     return wrapper
 
 
@@ -84,9 +83,7 @@ class Archive(object):
 class BaseArchive(object):
 
     required_config_params = (
-        'unpackdir',
         'contentdir',
-        'spooldir',
         'meta_filename',
     )
     # list of content types that cannot be displayed on the mixed content list
@@ -134,20 +131,20 @@ class BaseArchive(object):
         :param content_type:  int: content type id"""
         raise NotImplementedError()
 
-    def get_single(self, content_id):
-        """Return a single metadata object matching the given content id.
+    def get_single(self, relpath):
+        """Return a single metadata object matching the given content path.
         Implementation is backend specific.
 
-        :param content_id:  ID of content"""
+        :param relpath:  Relative path of content"""
         raise NotImplementedError()
 
-    def get_multiple(self, content_ids, fields=None):
+    def get_multiple(self, relpaths, fields=None):
         """Return iterable of matching content metadatas by the given list of
-        content ids.
+        content paths.
         Implementation is backend specific.
 
-        :param content_ids:  iterable of content ids to be found
-        :param fields:       list of fields to be fetched (defaults to all)"""
+        :param relpaths:  iterable of relative content paths to be found
+        :param fields:    list of fields to be fetched (defaults to all)"""
         raise NotImplementedError()
 
     def content_for_domain(self, domain):
@@ -166,11 +163,12 @@ class BaseArchive(object):
         :param metadata:  Dictionary of valid content metadata"""
         raise NotImplementedError()
 
-    def remove_meta_from_db(self, content_id):
+    def remove_meta_from_db(self, relpath):
         """Remove the specified content's metadata from the database.
         Implementation is backend specific.
 
-        :param content_id:  Id of content that is about to be deleted"""
+        :param relpath:  Relative path of content that is about to be deleted
+        """
         raise NotImplementedError()
 
     def add_replacement_data(self, metas, needed_keys, key_prefix='replaces_'):
@@ -178,12 +176,12 @@ class BaseArchive(object):
         needed data about the content that is about to be replaced to the new
         meta information, with it's keys prefixed by the specified string.
         [{
-            'md5': '123',
+            'path': '/some/where',
             'title': 'first',
-            'replaces': '456',
+            'replaces': '/this/there',
             ...
         }, {
-            'md5': 'abc',
+            'path': 'abc',
             'title': 'second',
             ...
         }]
@@ -191,26 +189,27 @@ class BaseArchive(object):
         Will be turned into:
 
         [{
-            'md5': '123',
+            'path': '/some/where',
             'title': 'first',
-            'replaces': '456',
+            'replaces': '/this/there',
             'replaces_title': 'old content title',
              ...
         }, {
-            'md5': 'abc',
+            'path': 'abc',
             'title': 'second',
             ...
         }]
         """
-        replaceable_ids = [meta['replaces'] for meta in metas
-                           if meta.get('replaces') is not None]
-        if not replaceable_ids:
+        replaceable_paths = [meta['replaces'] for meta in metas
+                             if meta.get('replaces') is not None]
+        if not replaceable_paths:
             return
 
-        needed_fields = tuple(sorted(set(tuple(needed_keys) + ('md5',))))
-        replaceables = self.get_multiple(replaceable_ids, fields=needed_fields)
+        needed_fields = tuple(sorted(set(tuple(needed_keys) + ('path',))))
+        replaceables = self.get_multiple(replaceable_paths,
+                                         fields=needed_fields)
         get_needed_data = lambda d: dict((key, d[key]) for key in needed_keys)
-        replaceable_metas = dict((data['md5'], get_needed_data(data))
+        replaceable_metas = dict((data['path'], get_needed_data(data))
                                  for data in replaceables)
         for meta in metas:
             if meta.get('replaces') in replaceable_metas:
@@ -219,22 +218,16 @@ class BaseArchive(object):
                     replace_key = '{0}{1}'.format(key_prefix, key)
                     meta[replace_key] = replaceable_metadata[key]
 
-    def delete_content_files(self, content_id):
+    def delete_content_files(self, relpath):
         """Delete the specified content's directory and all of it's files.
 
-        :param content_id:  Id of content that is about to be deleted
-        :returns:           bool: indicating success of deletion"""
-        content_path = content.to_path(content_id,
-                                       prefix=self.config['contentdir'])
-        if not content_path:
-            msg = "Invalid content_id passed: '{0}'".format(content_id)
-            logging.debug(msg)
-            return False
-
+        :param relpath:  Relative path of content which is about to be deleted
+        :returns:        bool: indicating success of deletion"""
+        content_path = os.path.join(self.config['contentdir'], relpath)
         try:
             shutil.rmtree(content_path)
         except Exception as exc:
-            logging.debug("Deletion of '{0}' failed: '{1}'".format(content_id,
+            logging.debug("Deletion of '{0}' failed: '{1}'".format(relpath,
                                                                    exc))
             return False
         else:
@@ -247,129 +240,66 @@ class BaseArchive(object):
         if path and not os.path.exists(os.path.join(content_path, path)):
             meta.pop(key, None)
 
-    def __add_auto_fields(self, meta, contentdir, content_id):
+    def __add_auto_fields(self, meta, relpath):
+        contentdir = self.config['contentdir']
         # add auto-generated values to metadata before writing into db
-        meta['md5'] = content_id
+        meta['path'] = relpath
         meta['updated'] = datetime.datetime.now()
-        meta['size'] = content.get_content_size(contentdir, content_id)
+        meta['size'] = content.get_content_size(contentdir, relpath)
         meta['content_type'] = metadata.determine_content_type(meta)
         # if cover or thumb images do not exist, avoid later filesystem lookups
         # by not writing the default paths into the storage
-        content_path = content.to_path(content_id, prefix=contentdir)
+        content_path = os.path.join(contentdir, relpath)
         for key in ('cover', 'thumb'):
             self.__drop_if_does_not_exist(meta, key, content_path)
 
-    def extract_zipball(self, zip_path, contentdir):
-        """Extract zipball found on `zip_path` into `contentdir`.
-        Before content extraction begins, symlink the extractedable zipball
-        into `unpackdir`, and remove the symlink only if extraction was
-        successful.
-        Startup hooks will look for symlinks that were not removed, which means
-        a zipball extraction failed and will attempt to resolve the issue."""
-        filename = os.path.basename(zip_path)
-        symlink_path = os.path.join(self.config['unpackdir'], filename)
-        if not os.path.exists(symlink_path):
-            os.symlink(zip_path, symlink_path)
-
-        zipballs.extract(zip_path, contentdir)
-        # if extract didn't raise an exception, it's safe to remove the symlink
-        os.unlink(symlink_path)
-
-    def process_content(self, content_id, zip_path, meta):
-        """Extract zipball and add it's metadata to the database.
-        - If extraction fails, it deletes the content folder.
-        - If metadata specifies that content is a replacement, old content will
-          be removed accordingly and replaced by new one.
-
-        :param content_id:  Id of content
-        :param zip_path:    Path to zipball to be extracted
-        :param meta:        Dictionary containing valid and clean metadata
-        :returns:           int / bool: indicating success
-        """
+    def __add_to_archive(self, relpath):
+        logging.debug("Adding content '{0}' to archive.".format(relpath))
+        meta_filename = self.config['meta_filename']
         contentdir = self.config['contentdir']
         try:
-            self.extract_zipball(zip_path, contentdir)
-        except Exception as exc:
-            logging.debug("Extraction of '{0}' failed: "
-                          "'{1}'".format(zip_path, exc))
-            self.delete_content_files(content_id)
+            meta = content.get_meta(contentdir, relpath, meta_filename)
+        except content.ValidationError as exc:
+            print(exc)
+            logging.debug("Metadata of '{0}' is invalid: '{1}'".format(relpath,
+                                                                       exc))
             return False
         else:
-            # extraction successful, delete zipball
-            os.remove(zip_path)
-            self.__add_auto_fields(meta, contentdir, content_id)
+            self.__add_auto_fields(meta, relpath)
             return self.add_meta_to_db(meta)
 
-    def __add_to_archive(self, content_id, src_dir):
-        # Validate specified zipball found in `src_dir` by it's `content_id`
-        # extract it and add it to archive database.
-        logging.debug("Adding content '{0}' to archive.".format(content_id))
-        meta_filename = self.config['meta_filename']
-        zip_path = zipballs.get_zip_path(content_id, src_dir)
-        try:
-            meta = zipballs.validate(zip_path, meta_filename=meta_filename)
-        except zipballs.ValidationError as exc:
-            logging.debug("Validation of '{0}' failed: "
-                          "'{1}'".format(zip_path, exc))
-            return False
-        else:
-            return self.process_content(content_id, zip_path, meta)
+    @to_list
+    def add_to_archive(self, relpaths):
+        """Add the specified content item(s) to the library.
+        Adds the meta information of the content item to the database.
 
-    @content_id_list
-    def add_to_archive(self, content_ids):
-        """Add the specified newly downloaded content(s) to the library.
-        Unpacks zipballs located in `spooldir` into `contentdir` and adds their
-        meta information to the database. The zipball from `spooldir` will be
-        deleted on successful import.
-
-        :param content_ids:  string: a single content id to be added
-                             iterable: an iterable of content ids to be added
-        :returns:            int: successfully added content count
+        :param relpaths:  string: a single content path to be added
+                          iterable: an iterable of content paths to be added
+        :returns:         int: successfully added content count
         """
-        return sum([self.__add_to_archive(cid, self.config['spooldir'])
-                    for cid in content_ids])
+        return sum([self.__add_to_archive(path) for path in relpaths])
 
-    def __remove_from_archive(self, content_id):
-        msg = "Removing content '{0}' from archive.".format(content_id)
+    def __remove_from_archive(self, relpath):
+        msg = "Removing content '{0}' from archive.".format(relpath)
         logging.debug(msg)
-        self.delete_content_files(content_id)
-        return self.remove_meta_from_db(content_id)
+        self.delete_content_files(relpath)
+        return self.remove_meta_from_db(relpath)
 
-    @content_id_list
-    def remove_from_archive(self, content_ids):
+    @to_list
+    def remove_from_archive(self, relpaths):
         """Removes the specified content(s) from the library.
         Deletes the matching content files from `contentdir` and removes their
         meta information from the database.
 
-        :param content_ids:  string: a single content id to be removed
-                             iterable: an iterable of content ids to be removed
-        :returns:            int: successfully removed content count"""
-        return sum([self.__remove_from_archive(cid) for cid in content_ids])
-
-    def __reload_content(self, content_id, contentdir):
-        meta_filename = self.config['meta_filename']
-        try:
-            raw_meta = content.get_meta(contentdir, content_id, meta_filename)
-            meta = metadata.process_meta(raw_meta)
-        except metadata.MetadataError as exc:
-            logging.debug("Metadata of '{0}' is invalid: "
-                          "'{1}'".format(content_id, exc))
-            return False
-        except (OSError, IOError) as exc:
-            logging.debug("Error opening metadata: '{1}'".format(content_id,
-                                                                 exc))
-            return False
-        else:
-            self.__add_auto_fields(meta, contentdir, content_id)
-            return self.add_meta_to_db(meta)
+        :param relpaths:  string: a single content path to be removed
+                          iterable: an iterable of content paths to be removed
+        :returns:         int: successfully removed content count"""
+        return sum([self.__remove_from_archive(path) for path in relpaths])
 
     def reload_content(self):
         """Reload all existing content from `contentdir` into database."""
-        contentdir = self.config['contentdir']
-        cont_ids = [content.to_md5(os.path.relpath(content_path, contentdir))
-                    for content_path in content.find_content_dirs(contentdir)]
-        return sum([self.__reload_content(cid, contentdir)
-                    for cid in cont_ids if cid])
+        relpaths = content.find_content_dirs(self.config['contentdir'])
+        return sum([self.__add_to_archive(path) for path in relpaths])
 
     def clear_and_reload(self):
         raise NotImplementedError()
@@ -377,7 +307,7 @@ class BaseArchive(object):
     def last_update(self):
         raise NotImplementedError()
 
-    def add_view(self, md5):
+    def add_view(self, relpath):
         raise NotImplementedError()
 
     def add_tags(self, meta, tags):
@@ -392,7 +322,7 @@ class BaseArchive(object):
     def get_tag_cloud(self):
         raise NotImplementedError()
 
-    def needs_formatting(self, md5):
+    def needs_formatting(self, relpath):
         raise NotImplementedError()
 
     def get_content_languages(self):

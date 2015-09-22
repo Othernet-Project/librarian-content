@@ -139,7 +139,6 @@ def process_meta(meta):
         keys = ', '.join(failed.keys())
         msg = "Metadata validation failed for keys: {0}".format(keys)
         raise MetadataError(msg, failed)
-
     replace_aliases(meta)
     add_missing_keys(meta)
     clean_keys(meta)

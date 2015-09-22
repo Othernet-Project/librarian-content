@@ -4,7 +4,7 @@ import os
 import mock
 fsal = mock.Mock()
 
-from .helpers import open_archive
+from .library.archive import Archive
 
 
 def is_content(path, meta_filename='.contentinfo'):
@@ -14,7 +14,10 @@ def is_content(path, meta_filename='.contentinfo'):
 
 def check_new_content(supervisor):
     config = supervisor.config
-    archive = open_archive(config=config)
+    archive = Archive.setup(config['library.backend'],
+                            supervisor.exts.databases.content,
+                            contentdir=config['library.contentdir'],
+                            meta_filename=config['library.metadata'])
     for path in fsal.get_changes():
         if is_content(path, meta_filename=config['library.metadata']):
             archive.add_to_archive(path)

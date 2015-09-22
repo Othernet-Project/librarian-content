@@ -17,8 +17,6 @@ import tempfile
 
 import pytest
 
-from librarian_content.library.content import content_path_components
-
 
 @pytest.fixture(scope='session')
 def metadata():
@@ -45,11 +43,11 @@ def md5dirs():
     for i in range(20):
         md5 = hashlib.md5()
         md5.update(str(random.random()).encode('utf8'))
-        h = md5.hexdigest()
-        cpath = os.sep.join(content_path_components(h))
+        cpath = md5.hexdigest()
         dpath = os.path.join(tmpdir, cpath)
         os.makedirs(dpath)
-        hashes.append(h)
+        open(os.path.join(dpath, '.contentinfo'), 'a').close()
+        hashes.append(cpath)
         dirs.append(dpath)
     yield hashes, dirs, tmpdir
     shutil.rmtree(tmpdir)
@@ -84,9 +82,9 @@ def metadata_dir(metadata):
     md5 = hashlib.md5()
     md5.update(str(random.random()))
     md5 = md5.hexdigest()
-    dpath = os.path.join(tmpdir, os.sep.join(content_path_components(md5)))
+    dpath = os.path.join(tmpdir, md5)
     os.makedirs(dpath)
-    with open(os.path.join(dpath, 'info.json'), 'wb') as f:
+    with open(os.path.join(dpath, '.contentinfo'), 'wb') as f:
         json.dump(metadata, f)
     yield md5, tmpdir
     shutil.rmtree(tmpdir)
@@ -103,9 +101,9 @@ def bad_metadata_dir():
     md5 = hashlib.md5()
     md5.update(str(random.random()))
     md5 = md5.hexdigest()
-    dpath = os.path.join(tmpdir, os.sep.join(content_path_components(md5)))
+    dpath = os.path.join(tmpdir, md5)
     os.makedirs(dpath)
-    with open(os.path.join(dpath, 'info.json'), 'wb') as f:
+    with open(os.path.join(dpath, '.contentinfo'), 'wb') as f:
         f.write('bogus\n')
     yield md5, tmpdir
     shutil.rmtree(tmpdir)

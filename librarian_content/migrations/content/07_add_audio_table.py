@@ -1,17 +1,17 @@
 SQL = """
 create table audio
 (
-    md5 varchar primary_key unique not null,
+    path varchar primary_key unique not null,
     description varchar
 );
 
 create table playlist
 (
-    md5 varchar primary_key not null,
+    path varchar primary_key unique not null,
     file varchar,
     title varchar,
     duration integer,
-    unique(md5, file) on conflict replace
+    unique(path, file) on conflict replace
 );
 """
 

@@ -1,9 +1,7 @@
 SQL = """
-alter table zipballs rename to tmp;
-
-create table zipballs
+create table content
 (
-    md5 varchar primary_key unique not null,
+    path varchar primary_key unique not null,
     url varchar not null,
     title varchar not null,
     timestamp timestamp not null,
@@ -20,19 +18,11 @@ create table zipballs
     size integer,
     broadcast date,
     keywords varchar not null default '',
-    disabled boolean not null default 0
+    disabled boolean not null default 0,
+    content_type int not null default 2,
+    cover varchar,
+    thumbnail varchar
 );
-
-replace into zipballs
-(md5, url, title, timestamp, updated, favorite, views, is_partner, is_sponsored,
-    archive, publisher, license, tags, language, size, broadcast, keywords,
-    disabled)
-select
-md5, url, title, timestamp, updated, favorite, views, is_partner, is_sponsored,
-archive, publisher, license, tags, language, size, broadcast, keywords, disabled
-from tmp;
-
-drop table tmp;
 """
 
 
