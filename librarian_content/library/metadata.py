@@ -22,6 +22,14 @@ from . import adapters
 
 
 SYSTEM_FILES = ('info.json', '.contentinfo', '.dirinfo')
+CONTENT_TYPE_EXTENSIONS = {
+    'generic': ['*'],
+    'html': ['html', 'htm'],
+    'video': ['mp4', 'wmv', 'webm', 'flv', 'ogv'],
+    'audio': [],
+    'app': [],
+    'image': []
+}
 CONTENT_TYPES = {
     'generic': 1,
     'html': 2,
