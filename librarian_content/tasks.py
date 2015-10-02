@@ -18,6 +18,8 @@ def check_new_content(supervisor):
                             supervisor.exts.databases.content,
                             contentdir=config['library.contentdir'],
                             meta_filename=config['library.metadata'])
-    for path in fsal.get_changes():
-        if is_content(path, meta_filename=config['library.metadata']):
-            archive.add_to_archive(path)
+    for fsobj in fsal.get_changes():
+        if is_content(fsobj.path, meta_filename=config['library.metadata']):
+            archive.add_to_archive(fsobj.path)
+        else:
+            supervisor.events.publish('FILE_ADDED', fsobj)
