@@ -1,8 +1,6 @@
 import os
 
-# TODO: import real fsal library
-import mock
-fsal = mock.Mock()
+import fsal
 
 from .library.archive import Archive
 
