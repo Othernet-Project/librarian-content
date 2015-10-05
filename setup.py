@@ -22,11 +22,9 @@ setup(
         'scandir',
         'outernet_metadata',
         'librarian_core',
-        'librarian_sqlite',
     ],
     dependency_links=[
         'git+ssh://git@github.com/Outernet-Project/librarian-core.git#egg=librarian_core-0.1',
-        'git+ssh://git@github.com/Outernet-Project/librarian-sqlite.git#egg=librarian_sqlite-0.1',
     ],
     classifiers=[
         'Development Status :: 3 - Alpha',
