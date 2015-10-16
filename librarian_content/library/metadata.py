@@ -10,17 +10,21 @@ file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 
 from __future__ import unicode_literals
 
-import os
-import json
 import functools
+import json
+import os
+import re
 
+import dateutil
 import scandir
 
 from outernet_metadata import validator
 
 from . import adapters
+from .utils import is_string
 
 
+NUMERIC_RE = re.compile(r'^[\d\.]+$')
 SYSTEM_FILES = ('info.json', '.contentinfo', '.dirinfo')
 CONTENT_TYPE_EXTENSIONS = {
     'generic': ['*'],
@@ -138,6 +142,31 @@ def upgrade_meta(meta):
             upgrade_fn(meta)
 
 
+def to_datetime(value):
+    if is_string(value) and not NUMERIC_RE.match(value):
+        try:
+            return dateutil.parser.parse(value)
+        except Exception:
+            pass
+
+    return value
+
+
+def parse_datetime(obj):
+    if isinstance(obj, dict):
+        for key, value in obj.items():
+            if isinstance(value, (dict, list)):
+                parse_datetime(value)
+            else:
+                obj[key] = to_datetime(value)
+    elif isinstance(obj, list):
+        for idx, value in enumerate(obj):
+            if isinstance(value, (dict, list)):
+                parse_datetime(value)
+            else:
+                obj[idx] = to_datetime(value)
+
+
 def process_meta(meta):
     # attempt bringing metadata up to latest specification before passing it to
     # the validator
@@ -150,6 +179,7 @@ def process_meta(meta):
     replace_aliases(meta)
     add_missing_keys(meta)
     clean_keys(meta)
+    parse_datetime(meta)
     return meta
 
 

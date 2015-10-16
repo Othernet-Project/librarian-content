@@ -8,7 +8,6 @@ This software is free software licensed under the terms of GPLv3. See COPYING
 file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 """
 
-import functools
 import logging
 import os
 import shutil
@@ -17,23 +16,7 @@ from librarian_core.utils import utcnow
 
 from . import content
 from . import metadata
-
-
-def is_string(obj):
-    if 'basestring' not in globals():
-        basestring = str
-    return isinstance(obj, basestring)
-
-
-def to_list(func):
-    """In case a single string parameter is passed to the function wrapped
-    with this decorator, the single parameter will be wrapped in a list."""
-    @functools.wraps(func)
-    def wrapper(self, arg):
-        if is_string(arg):
-            arg = [arg]
-        return func(self, arg)
-    return wrapper
+from .utils import to_list
 
 
 class Archive(object):
