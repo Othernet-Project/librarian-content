@@ -8,11 +8,12 @@ This software is free software licensed under the terms of GPLv3. See COPYING
 file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 """
 
-import datetime
 import functools
 import logging
 import os
 import shutil
+
+from librarian_core.utils import utcnow
 
 from . import content
 from . import metadata
@@ -244,7 +245,7 @@ class BaseArchive(object):
         contentdir = self.config['contentdir']
         # add auto-generated values to metadata before writing into db
         meta['path'] = relpath
-        meta['updated'] = datetime.datetime.now()
+        meta['updated'] = utcnow()
         meta['size'] = content.get_content_size(contentdir, relpath)
         meta['content_type'] = metadata.determine_content_type(meta)
         # if cover or thumb images do not exist, avoid later filesystem lookups
