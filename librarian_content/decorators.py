@@ -15,7 +15,7 @@ def with_meta(abort_if_not_found=True):
             archive = Archive.setup(conf['library.backend'],
                                     request.db.content,
                                     contentdir=conf['library.contentdir'],
-                                    meta_filename=conf['library.metadata'])
+                                    meta_filenames=conf['library.metadata'])
             content = archive.get_single(path)
             if not content:
                 if abort_if_not_found:

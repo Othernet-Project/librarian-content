@@ -68,7 +68,7 @@ class BaseArchive(object):
 
     required_config_params = (
         'contentdir',
-        'meta_filename',
+        'meta_filenames',
     )
     # list of content types that cannot be displayed on the mixed content list
     # where all other types are mixed together
@@ -239,10 +239,10 @@ class BaseArchive(object):
 
     def __add_to_archive(self, relpath):
         logging.debug("Adding content '{0}' to archive.".format(relpath))
-        meta_filename = self.config['meta_filename']
+        meta_filenames = self.config['meta_filenames']
         contentdir = self.config['contentdir']
         try:
-            meta = content.get_meta(contentdir, relpath, meta_filename)
+            meta = content.get_meta(contentdir, relpath, meta_filenames)
         except content.ValidationError as exc:
             print(exc)
             logging.debug("Metadata of '{0}' is invalid: '{1}'".format(relpath,
@@ -282,7 +282,8 @@ class BaseArchive(object):
 
     def reload_content(self):
         """Reload all existing content from `contentdir` into database."""
-        relpaths = content.find_content_dirs(self.config['contentdir'])
+        relpaths = content.find_content_dirs(self.config['contentdir'],
+                                             self.config['meta_filenames'])
         return sum([self.__add_to_archive(path) for path in relpaths])
 
     def clear_and_reload(self):

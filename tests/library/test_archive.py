@@ -93,7 +93,7 @@ class TestArchive(object):
 @pytest.fixture
 def base_archive():
     return mod.BaseArchive(contentdir='contentdir',
-                           meta_filename='metafile.ext')
+                           meta_filenames=['metafile.ext'])
 
 
 class TestBaseArchive(object):
@@ -103,7 +103,7 @@ class TestBaseArchive(object):
             mod.BaseArchive()
 
     def test_base_archive_init_success(self):
-        archive = mod.BaseArchive(contentdir='test', meta_filename='test')
+        archive = mod.BaseArchive(contentdir='test', meta_filenames=['test'])
         init_flag = '_{0}__initialized'.format(mod.BaseArchive.__name__)
         assert hasattr(archive, init_flag)
 
@@ -149,7 +149,9 @@ class TestBaseArchive(object):
         relpath = 'somewhere'
         add_meta_to_db.return_value = True
         assert base_archive._BaseArchive__add_to_archive(relpath)
-        get_meta.assert_called_once_with('contentdir', relpath, 'metafile.ext')
+        get_meta.assert_called_once_with('contentdir',
+                                         relpath,
+                                         ['metafile.ext'])
         __add_auto_fields.assert_called_once_with(get_meta.return_value,
                                                   relpath)
         add_meta_to_db.assert_called_once_with(get_meta.return_value)
@@ -161,7 +163,9 @@ class TestBaseArchive(object):
         relpath = 'somewhere'
         get_meta.side_effect = mod.content.ValidationError('a', 'b')
         assert not base_archive._BaseArchive__add_to_archive(relpath)
-        get_meta.assert_called_once_with('contentdir', relpath, 'metafile.ext')
+        get_meta.assert_called_once_with('contentdir',
+                                         relpath,
+                                         ['metafile.ext'])
         assert not add_meta_to_db.called
 
     @mock.patch.object(mod.BaseArchive, '_BaseArchive__add_to_archive')

@@ -1,3 +1,4 @@
+import datetime
 import os
 
 import mock
@@ -44,7 +45,7 @@ def test_find_content_dir(md5dirs):
     for d in dirs:
         os.makedirs(os.path.join(d, 'abc'))  # add subdirectories into content
 
-    ret = list(mod.find_content_dirs(tmpdir, relative=False))
+    ret = list(mod.find_content_dirs(tmpdir, ['.contentinfo'], relative=False))
     dirs.sort()
     ret.sort()
     assert ret == dirs
@@ -54,21 +55,24 @@ def test_find_content_dir(md5dirs):
 def test_get_meta(upgrade_meta, metadata_dir, metadata):
     """ Load and parse metadata from md5-based dir stcture under base dir """
     md5, tmpdir = metadata_dir
-    ret = mod.get_meta(tmpdir, md5)
-    assert all([val == ret[key] for key, val in metadata.items()])
+    ret = mod.get_meta(tmpdir, md5, ['.contentinfo', 'info.json'])
+    for key, expected in metadata.items():
+        got = ret[key]
+        if not isinstance(got, datetime.datetime):
+            assert expected == got
 
 
 def test_get_meta_with_missing_metadta(md5dirs):
     hashes, dirs, tmpdir = md5dirs
     md5 = hashes[0]
     with pytest.raises(mod.ValidationError):
-        mod.get_meta(tmpdir, md5)
+        mod.get_meta(tmpdir, md5, ['.contentinfo'])
 
 
 def test_get_meta_with_bad_metadta(bad_metadata_dir, metadata):
     md5, tmpdir = bad_metadata_dir
     with pytest.raises(mod.ValidationError):
-        mod.get_meta(tmpdir, md5)
+        mod.get_meta(tmpdir, md5, ['metafile'])
 
 
 @mock.patch.object(mod, 'filewalk')

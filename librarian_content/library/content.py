@@ -34,10 +34,10 @@ def filewalk(basedir):
             yield entry.path
 
 
-def find_content_dirs(basedir, meta_filename='.contentinfo', relative=True):
+def find_content_dirs(basedir, meta_filenames, relative=True):
     """Find all content directories within basedir"""
     for path in filewalk(basedir):
-        if os.path.basename(path) == meta_filename:
+        if os.path.basename(path) in meta_filenames:
             content_path = os.path.dirname(path)
             if relative:
                 yield os.path.relpath(content_path, basedir)
@@ -45,20 +45,26 @@ def find_content_dirs(basedir, meta_filename='.contentinfo', relative=True):
                 yield content_path
 
 
-def get_meta(basedir, relpath, meta_filename='.contentinfo', encoding='utf8'):
-    """Find `meta_filename` at the specified path, read, parse, validate and
+def get_meta(basedir, relpath, meta_filenames, encoding='utf8'):
+    """Find a meta file at the specified path, read, parse, validate and
     then return it."""
-    path = os.path.abspath(os.path.join(basedir, relpath, meta_filename))
+    meta_paths = (os.path.abspath(os.path.join(basedir, relpath, filename))
+                  for filename in meta_filenames)
     try:
-        with open(path, 'rb') as f:
-            raw_meta = json.load(f, encoding)
-            return metadata.process_meta(raw_meta)
-    except metadata.MetadataError as exc:
-        raise ValidationError(path, str(exc))
-    except (KeyError, ValueError):
-        raise ValidationError(path, 'missing or malformed metadata file')
-    except (OSError, IOError):
-        raise ValidationError(path, 'metadata file cannot be opened')
+        (path,) = [path for path in meta_paths if os.path.exists(path)]
+    except ValueError:
+        raise ValidationError(relpath, 'missing metadata file')
+    else:
+        try:
+            with open(path, 'rb') as f:
+                raw_meta = json.load(f, encoding)
+                return metadata.process_meta(raw_meta)
+        except metadata.MetadataError as exc:
+            raise ValidationError(path, str(exc))
+        except (KeyError, ValueError):
+            raise ValidationError(path, 'malformed metadata file')
+        except (OSError, IOError):
+            raise ValidationError(path, 'metadata file cannot be opened')
 
 
 def get_content_size(basedir, relpath):
