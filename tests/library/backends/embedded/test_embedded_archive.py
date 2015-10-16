@@ -1,7 +1,7 @@
 import mock
 import pytest
 
-from librarian_sqlite.squery import Database
+from librarian_core.contrib.databases.squery import Database
 
 import librarian_content.library.backends.embedded.archive as mod
 
