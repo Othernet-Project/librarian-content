@@ -15,7 +15,7 @@ import json
 import os
 import re
 
-import dateutil
+import dateutil.parser
 import scandir
 
 from outernet_metadata import validator
@@ -146,7 +146,7 @@ def to_datetime(value):
     if is_string(value) and not NUMERIC_RE.match(value):
         try:
             return dateutil.parser.parse(value)
-        except Exception:
+        except (ValueError, TypeError):
             pass
 
     return value

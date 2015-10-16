@@ -1,3 +1,4 @@
+from datetime import datetime
 from functools import wraps
 from contextlib import contextmanager
 
@@ -351,3 +352,24 @@ def test_determine_content_type():
     mixed = {'content': {'app': None, 'generic': None}}
     expected = mod.CONTENT_TYPES['app'] + mod.CONTENT_TYPES['generic']
     assert mod.determine_content_type(mixed) == expected
+
+
+def test_parse_datetime():
+    test = {
+        'first': 1,
+        'another': '11',
+        'second': 'str',
+        'third': ['a', {'b': 'fake', 'c': '2012-05-08'}],
+        'fourth': {
+            'd': '2015-10-16T13:06:01.540391',
+            'e': [{
+                'g': '2015-10-16T13:06:01.540391'
+            }]
+        }
+    }
+    mod.parse_datetime(test)
+    assert isinstance(test['first'], int)
+    assert isinstance(test['another'], str)
+    assert isinstance(test['third'][1]['c'], datetime)
+    assert isinstance(test['fourth']['d'], datetime)
+    assert isinstance(test['fourth']['e'][0]['g'], datetime)
