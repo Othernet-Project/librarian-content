@@ -172,7 +172,6 @@ def process_meta(meta):
     # the validator
     upgrade_meta(meta)
     failed = validator.validate(meta, broadcast=True)
-    print(failed)
     if failed:
         keys = ', '.join(failed.keys())
         msg = "Metadata validation failed for keys: {0}".format(keys)
