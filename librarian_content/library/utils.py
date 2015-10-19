@@ -1,11 +1,6 @@
 import functools
 
-
-def is_string(obj):
-    try:
-        return isinstance(obj, basestring)
-    except NameError:
-        return isinstance(obj, str)
+from librarian_core.utils import is_string
 
 
 def to_list(func):

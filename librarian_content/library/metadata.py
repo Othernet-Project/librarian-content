@@ -20,8 +20,9 @@ import scandir
 
 from outernet_metadata import validator
 
+from librarian_core.utils import is_string
+
 from . import adapters
-from .utils import is_string
 
 
 NUMERIC_RE = re.compile(r'^[\d\.]+$')
@@ -143,7 +144,7 @@ def upgrade_meta(meta):
 
 
 def to_datetime(value):
-    if is_string(value) and not NUMERIC_RE.match(value):
+    if is_string(value) and not NUMERIC_RE.match(value) and value:
         try:
             return dateutil.parser.parse(value)
         except (ValueError, TypeError):
