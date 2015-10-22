@@ -68,9 +68,9 @@ def get_random_title():
     return uuid.uuid4().hex
 
 
-def slugify(source, delim=u'_'):
+def safe_title(source, delim=u' '):
     result = []
-    for word in PUNCT.split(source.lower()):
+    for word in PUNCT.split(source):
         word = unicodedata.normalize('NFKD', word).encode('ascii', 'ignore')
         if word:
             result.append(word)
@@ -89,8 +89,9 @@ def import_content(srcdir, destdir, meta_filenames):
         except ValidationError:
             continue
         else:
-            title = slugify(meta['title']) or slugify(meta.get('url', ''))
-            title = title or get_random_title()
+            title = (safe_title(meta['title']) or
+                     safe_title(meta['url']) or
+                     get_random_title())
             dest_path = os.path.join(destdir, title)
             if not os.path.exists(dest_path):
                 shutil.copytree(src_path, dest_path)
