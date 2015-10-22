@@ -19,7 +19,7 @@ create table content
     broadcast date,
     keywords varchar not null default '',
     disabled boolean not null default 0,
-    content_type int not null default 2,
+    content_type int not null default 1,  --default content type is ``generic``
     cover varchar,
     thumbnail varchar
 );
