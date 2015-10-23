@@ -1,7 +1,5 @@
 import os
 
-import fsal
-
 from .library.archive import Archive
 
 
@@ -16,7 +14,7 @@ def check_new_content(supervisor):
                             supervisor.exts.databases.content,
                             contentdir=config['library.contentdir'],
                             meta_filenames=config['library.metadata'])
-    for fsobj in fsal.get_changes():
+    for fsobj in supervisor.exts.fsal.get_changes():
         if is_content(fsobj.path, config['library.metadata']):
             archive.add_to_archive(fsobj.path)
         else:
