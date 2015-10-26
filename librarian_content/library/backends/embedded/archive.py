@@ -236,7 +236,7 @@ class EmbeddedArchive(BaseArchive):
         self.db.query(q, **primitives)
 
     def add_meta_to_db(self, metadata):
-        with self.db.transaction() as cur:
+        with self.db.transaction():
             logging.debug("Adding new content to archive database")
             replaces = metadata.get('replaces')
             self._serialize(metadata, self.transformations)
