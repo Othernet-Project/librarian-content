@@ -101,10 +101,10 @@ class EmbeddedArchive(BaseArchive):
         'album': {}
     }
 
-    def __init__(self, db, **config):
+    def __init__(self, fsal, db, **config):
         self.db = db
         self.sqlin = lambda *args, **kw: self.db.sqlin.__func__(*args, **kw)
-        super(EmbeddedArchive, self).__init__(**config)
+        super(EmbeddedArchive, self).__init__(fsal, **config)
 
     @to_dict
     def one(self):

@@ -13,19 +13,14 @@ from __future__ import unicode_literals
 import functools
 import json
 import os
-import re
 
-import dateutil.parser
-import scandir
-
+from bottle_utils.lazy import caching_lazy
+from librarian_core.utils import to_datetime
 from outernet_metadata import validator
-
-from librarian_core.utils import is_string
 
 from . import adapters
 
 
-NUMERIC_RE = re.compile(r'^[\d\.]+$')
 SYSTEM_FILES = ('info.json', '.contentinfo', '.dirinfo')
 CONTENT_TYPE_EXTENSIONS = {
     'generic': ['*'],
@@ -48,30 +43,34 @@ ALIASES = {
 }
 
 
-def is_deprecated(key):
-    return validator.values.v.deprecated in validator.values.SPECS[key]
+class MetadataError(Exception):
+    """ Base metadata error """
+    def __init__(self, msg, errors):
+        self.errors = errors
+        super(MetadataError, self).__init__(msg)
 
 
+class ValidationError(Exception):
+    """ Raised when metadata fails validation """
+    def __init__(self, path, msg):
+        self.path = path
+        self.msg = msg
+        super(ValidationError, self).__init__(msg)
+
+
+@caching_lazy
 def get_edge_keys():
     """ Return the most recent valid key names.
 
     :returns:  tuple of strings(key names)"""
+    is_deprecated = lambda key: (validator.values.v.deprecated in
+                                 validator.values.SPECS[key])
     edge_keys = set()
     for key in validator.values.KEYS:
         if not is_deprecated(key):
             edge_keys.add(key)
 
     return tuple(edge_keys)
-
-
-EDGE_KEYS = get_edge_keys()
-
-
-class MetadataError(Exception):
-    """ Base metadata error """
-    def __init__(self, msg, errors):
-        self.errors = errors
-        super(MetadataError, self).__init__(msg)
 
 
 def add_missing_keys(meta):
@@ -83,7 +82,8 @@ def add_missing_keys(meta):
 
     :param meta:    metadata dict
     """
-    for key in EDGE_KEYS:
+    edge_keys = get_edge_keys()
+    for key in edge_keys:
         if key not in meta:
             meta[key] = validator.values.DEFAULTS.get(key, None)
 
@@ -96,7 +96,8 @@ def replace_aliases(meta):
 
     :param meta:    metadata dict
     """
-    for key in EDGE_KEYS:
+    edge_keys = get_edge_keys()
+    for key in edge_keys:
         if key not in meta:
             for alias in ALIASES.get(key, []):
                 if alias in meta:
@@ -111,8 +112,9 @@ def clean_keys(meta):
 
     :param meta:  metadata dict
     """
+    edge_keys = get_edge_keys()
     for key in meta.keys():
-        if key not in EDGE_KEYS:
+        if key not in edge_keys:
             del meta[key]
 
 
@@ -143,17 +145,9 @@ def upgrade_meta(meta):
             upgrade_fn(meta)
 
 
-def to_datetime(value):
-    if is_string(value) and not NUMERIC_RE.match(value) and value:
-        try:
-            return dateutil.parser.parse(value)
-        except (ValueError, TypeError):
-            pass
-
-    return value
-
-
 def parse_datetime(obj):
+    """Recursively discover and attempt to convert strings the may represent a
+    datetime object."""
     if isinstance(obj, dict):
         for key, value in obj.items():
             if isinstance(value, (dict, list)):
@@ -184,6 +178,28 @@ def process_meta(meta):
     return meta
 
 
+def get_meta(basedir, relpath, meta_filenames, encoding='utf8'):
+    """Find a meta file at the specified path, read, parse, validate and
+    then return it."""
+    meta_paths = (os.path.abspath(os.path.join(basedir, relpath, filename))
+                  for filename in meta_filenames)
+    try:
+        (path,) = [path for path in meta_paths if os.path.exists(path)]
+    except ValueError:
+        raise ValidationError(relpath, 'missing metadata file')
+    else:
+        try:
+            with open(path, 'rb') as f:
+                raw_meta = json.load(f, encoding)
+                return process_meta(raw_meta)
+        except MetadataError as exc:
+            raise ValidationError(path, str(exc))
+        except (KeyError, ValueError):
+            raise ValidationError(path, 'malformed metadata file')
+        except (OSError, IOError):
+            raise ValidationError(path, 'metadata file cannot be opened')
+
+
 def determine_content_type(meta):
     """Calculate bitmask of the passed in metadata based on the content types
     found in it."""
@@ -197,23 +213,16 @@ class Meta(object):
     This classed is used as a dict wrapper that provides attrbute access to
     keys, and a few additional properties and methods to ease working with
     metadta.
-
-    Parts of this class are tied to the filesystem (notably the parts that deal
-    with content thumbnails). This functionality may be factored out of this
-    class at a later time.
     """
-    def __init__(self, meta, content_path):
+    def __init__(self, meta):
         """ Metadata wrapper instantiation
 
         :param meta:          dict: Raw metadata as dict
-        :param content_path:  str: Absolute path to specific content
         """
         self.meta = dict((key, meta[key]) for key in meta.keys())
         # We use ``or`` in the following line because 'tags' can be an empty
         # string, which is treated as invalid JSON
         self.tags = json.loads(meta.get('tags') or '{}')
-        self._files = None
-        self.content_path = content_path
 
     def __getattr__(self, attr):
         try:
@@ -244,14 +253,6 @@ class Meta(object):
         """
         return self.meta.get(key, default)
 
-    def find_files(self):
-        if not self.content_path or not os.path.exists(self.content_path):
-            return []
-
-        return [(filename, os.stat(os.path.join(root, filename)).st_size)
-                for root, _, filenames in scandir.walk(self.content_path)
-                for filename in filenames if filename not in SYSTEM_FILES]
-
     @property
     def lang(self):
         return self.meta.get('language')
@@ -265,12 +266,6 @@ class Meta(object):
         elif self.meta.get('is_partner'):
             return 'partner'
         return 'core'
-
-    @property
-    def files(self):
-        if self._files is None:
-            self._files = self.find_files()
-        return self._files
 
     @property
     def content_type_names(self):

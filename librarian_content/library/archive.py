@@ -10,11 +10,9 @@ file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 
 import logging
 import os
-import shutil
 
 from librarian_core.utils import utcnow
 
-from . import content
 from . import metadata
 from .utils import to_list
 
@@ -81,7 +79,8 @@ class BaseArchive(object):
         'app',
     )
 
-    def __init__(self, **config):
+    def __init__(self, fsal, **config):
+        self.fsal = fsal
         self.config = config
         for key in self.required_config_params:
             if key not in self.config:
@@ -207,9 +206,8 @@ class BaseArchive(object):
 
         :param relpath:  Relative path of content which is about to be deleted
         :returns:        bool: indicating success of deletion"""
-        content_path = os.path.join(self.config['contentdir'], relpath)
         try:
-            shutil.rmtree(content_path)
+            self.fsal.remove(relpath)
         except Exception as exc:
             logging.debug("Deletion of '{0}' failed: '{1}'".format(relpath,
                                                                    exc))
@@ -217,34 +215,26 @@ class BaseArchive(object):
         else:
             return True
 
-    def __drop_if_does_not_exist(self, meta, key, content_path):
-        """Check if the file specified in `meta` under `key` exists in the
-        content folder and drop `key` from `meta` in case it doesn't."""
-        path = meta.get(key)
-        if path and not os.path.exists(os.path.join(content_path, path)):
-            meta.pop(key, None)
-
     def __add_auto_fields(self, meta, relpath):
-        contentdir = self.config['contentdir']
         # add auto-generated values to metadata before writing into db
         meta['path'] = relpath
         meta['updated'] = utcnow()
-        meta['size'] = content.get_content_size(contentdir, relpath)
+        meta['size'] = self.fsal.get_fso(relpath).size
         meta['content_type'] = metadata.determine_content_type(meta)
         # if cover or thumb images do not exist, avoid later filesystem lookups
         # by not writing the default paths into the storage
-        content_path = os.path.join(contentdir, relpath)
         for key in ('cover', 'thumb'):
-            self.__drop_if_does_not_exist(meta, key, content_path)
+            file_path = os.path.join(relpath, meta.get(key))
+            if not self.fsal.exists(file_path):
+                meta.pop(key, None)
 
     def __add_to_archive(self, relpath):
         logging.debug("Adding content '{0}' to archive.".format(relpath))
         meta_filenames = self.config['meta_filenames']
         contentdir = self.config['contentdir']
         try:
-            meta = content.get_meta(contentdir, relpath, meta_filenames)
-        except content.ValidationError as exc:
-            print(exc)
+            meta = metadata.get_meta(contentdir, relpath, meta_filenames)
+        except metadata.ValidationError as exc:
             logging.debug("Metadata of '{0}' is invalid: '{1}'".format(relpath,
                                                                        exc))
             return False
@@ -280,11 +270,23 @@ class BaseArchive(object):
         :returns:         int: successfully removed content count"""
         return sum([self.__remove_from_archive(path) for path in relpaths])
 
+    def find_content_dirs(self, relative=True):
+        """Find all content directories within basedir"""
+        meta_filenames = self.config['meta_filenames']
+        query = ' '.join(meta_filenames)
+        (dirs, files, is_match) = self.fsal.search(query, whole_words=True)
+        for fs_obj in files:
+            # since search result paths all point to exact meta files,
+            # ``dirname`` is used to return the parent folder
+            if relative:
+                yield os.path.dirname(fs_obj.rel_path)
+            else:
+                yield os.path.dirname(fs_obj.path)
+
     def reload_content(self):
         """Reload all existing content from `contentdir` into database."""
-        relpaths = content.find_content_dirs(self.config['contentdir'],
-                                             self.config['meta_filenames'])
-        return sum([self.__add_to_archive(path) for path in relpaths])
+        return sum([self.__add_to_archive(path)
+                    for path in self.find_content_dirs()])
 
     def clear_and_reload(self):
         raise NotImplementedError()
