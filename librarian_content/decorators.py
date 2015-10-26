@@ -1,5 +1,4 @@
 import functools
-import os
 
 from bottle import abort, request
 
@@ -23,8 +22,7 @@ def with_meta(abort_if_not_found=True):
                     abort(404)
                 return func(path=path, meta=None, **kwargs)
 
-            content_path = os.path.join(archive.config['contentdir'], path)
-            meta = metadata.Meta(content, content_path)
+            meta = metadata.Meta(content)
             return func(path=path, meta=meta, **kwargs)
         return wrapper
     return decorator
