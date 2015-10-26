@@ -11,6 +11,7 @@ def is_content(path, meta_filenames):
 def check_new_content(supervisor):
     config = supervisor.config
     archive = Archive.setup(config['library.backend'],
+                            supervisor.exts.fsal,
                             supervisor.exts.databases.content,
                             contentdir=config['library.contentdir'],
                             meta_filenames=config['library.metadata'])
