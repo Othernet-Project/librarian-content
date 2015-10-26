@@ -6,7 +6,7 @@ import uuid
 
 import scandir
 
-from .library.content import get_meta, ValidationError
+from .library.metadata import get_meta, ValidationError
 
 try:
     unicode = unicode
