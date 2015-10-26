@@ -92,7 +92,9 @@ class TestArchive(object):
 
 @pytest.fixture
 def base_archive():
-    return mod.BaseArchive(contentdir='contentdir',
+    mocked_fsal = mock.Mock()
+    return mod.BaseArchive(mocked_fsal,
+                           contentdir='contentdir',
                            meta_filenames=['metafile.ext'])
 
 
@@ -100,12 +102,11 @@ class TestBaseArchive(object):
 
     def test_base_archive_init_fail(self):
         with pytest.raises(TypeError):
-            mod.BaseArchive()
+            mod.BaseArchive(mock.Mock())
 
-    def test_base_archive_init_success(self):
-        archive = mod.BaseArchive(contentdir='test', meta_filenames=['test'])
+    def test_base_archive_init_success(self, base_archive):
         init_flag = '_{0}__initialized'.format(mod.BaseArchive.__name__)
-        assert hasattr(archive, init_flag)
+        assert hasattr(base_archive, init_flag)
 
     @mock.patch.object(mod.BaseArchive, 'get_multiple')
     def test_add_repacement_data(self, get_multiple, base_archive):
@@ -130,20 +131,18 @@ class TestBaseArchive(object):
         assert metas == [{'path': 'abc', 'title': 'second'}]
         assert not get_multiple.called
 
-    @mock.patch.object(mod, 'shutil')
-    def test_delete_content_files_success(self, shutil, base_archive):
-        assert base_archive.delete_content_files('some_id')
-        shutil.rmtree.assert_called_once_with('contentdir/some_id')
+    def test_delete_content_files_success(self, base_archive):
+        assert base_archive.delete_content_files('rel/path')
+        base_archive.fsal.remove.assert_called_once_with('rel/path')
 
-    @mock.patch.object(mod, 'shutil')
-    def test_delete_content_files_fail(self, shutil, base_archive):
-        shutil.rmtree.side_effect = OSError()
-        assert not base_archive.delete_content_files('some_id')
-        shutil.rmtree.assert_called_once_with('contentdir/some_id')
+    def test_delete_content_files_fail(self, base_archive):
+        base_archive.fsal.remove.side_effect = Exception()
+        assert not base_archive.delete_content_files('rel/path')
+        base_archive.fsal.remove.assert_called_once_with('rel/path')
 
     @mock.patch.object(mod.BaseArchive, 'add_meta_to_db')
     @mock.patch.object(mod.BaseArchive, '_BaseArchive__add_auto_fields')
-    @mock.patch.object(mod.content, 'get_meta')
+    @mock.patch.object(mod.metadata, 'get_meta')
     def test___add_to_archive_success(self, get_meta, __add_auto_fields,
                                       add_meta_to_db, base_archive):
         relpath = 'somewhere'
@@ -157,11 +156,11 @@ class TestBaseArchive(object):
         add_meta_to_db.assert_called_once_with(get_meta.return_value)
 
     @mock.patch.object(mod.BaseArchive, 'add_meta_to_db')
-    @mock.patch.object(mod.content, 'get_meta')
+    @mock.patch.object(mod.metadata, 'get_meta')
     def test___add_to_archive_meta_error(self, get_meta, add_meta_to_db,
                                          base_archive):
         relpath = 'somewhere'
-        get_meta.side_effect = mod.content.ValidationError('a', 'b')
+        get_meta.side_effect = mod.metadata.ValidationError('a', 'b')
         assert not base_archive._BaseArchive__add_to_archive(relpath)
         get_meta.assert_called_once_with('contentdir',
                                          relpath,
@@ -198,7 +197,7 @@ class TestBaseArchive(object):
                                                 mock.call('other_id')])
 
     @mock.patch.object(mod.BaseArchive, '_BaseArchive__add_to_archive')
-    @mock.patch.object(mod.content, 'find_content_dirs')
+    @mock.patch.object(mod.BaseArchive, 'find_content_dirs')
     def test_reload_content(self, find_content_dirs, __add_to_archive,
                             base_archive):
         find_content_dirs.return_value = ['contentdir/contentid',

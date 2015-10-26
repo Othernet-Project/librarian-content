@@ -11,9 +11,11 @@ MOD = mod.__name__
 
 @pytest.fixture
 def archive():
+    mocked_fsal = mock.Mock()
     mocked_db = mock.Mock()
     mocked_db.sqlin = Database.sqlin
-    return mod.EmbeddedArchive(mocked_db,
+    return mod.EmbeddedArchive(mocked_fsal,
+                               mocked_db,
                                contentdir='contentdir',
                                meta_filenames=['metafile.ext'])
 
