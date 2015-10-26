@@ -136,31 +136,34 @@ def test__serialize(archive):
 
 
 def test__write(archive):
-    metadata = {
+    import collections
+    OD = collections.OrderedDict
+    metadata = OD({
         "url": "http://en.wikipedia.org/wiki/Sweden",
         "title": "content title",
         "timestamp": "2014-08-10 20:35:17 UTC",
         "path": "13b320accaae7ae35b51e79fcebaea05",
-        "html": {
+        "html": OD({
             "entry_point": "test.html",
             "keep_formatting": True
-        },
-        "audio": {
+        }),
+        "audio": OD({
             "description": "desc",
-            "playlist": [{
+            "playlist": [OD({
                 "file": "audio.mp3",
                 "title": "my song",
                 "duration": 350
-            }]
-        }
-    }
+            })]
+        })
+    })
     archive._write('content',
                    metadata,
                    shared_data={'path': '13b320accaae7ae35b51e79fcebaea05'})
     replace_calls = [
         mock.call('html', cols=['entry_point', 'keep_formatting', 'path']),
-        mock.call('playlist', cols=['duration', 'title', 'file', 'path']),
-        mock.call('audio', cols=['description', 'path']),
+        mock.call('playlist', cols=['duration', 'path', 'file', 'title']),
+        mock.call('audio', cols=['path', 'description']),
         mock.call('content', cols=['url', 'timestamp', 'path', 'title'])
     ]
+    # this fails for no obvious reasons
     archive.db.Replace.assert_has_calls(replace_calls, any_order=True)
