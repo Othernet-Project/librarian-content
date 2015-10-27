@@ -1,11 +1,10 @@
+import json
 import os
 import re
 import shutil
 import uuid
 
 import scandir
-
-from .library.metadata import get_meta, ValidationError
 
 try:
     unicode = unicode
@@ -75,21 +74,64 @@ def safe_title(source, delim=u' '):
     return unicode(delim.join(result))
 
 
-def import_content(srcdir, destdir, meta_filenames):
+def read_meta(basedir, meta_filenames):
+    meta = None
+    for filename in meta_filenames:
+        meta_path = os.path.join(basedir, filename)
+        if os.path.exists(meta_path):
+            try:
+                with open(meta_path, 'r') as meta_file:
+                    meta = json.load(meta_file)
+            except Exception:
+                continue
+
+    return meta
+
+
+def upgrade_meta(meta):
+    meta['gen'] = 1
+    meta['content'] = {
+        'html': {
+            'main': meta.pop('index', 'index.html'),
+            'keep_formatting': meta.pop('keep_formatting', False)
+        }
+    }
+    for ignored in ('images', 'multipage'):
+        meta.pop(ignored, None)
+
+
+def delete_old_meta(path, meta_filenames):
+    if len(meta_filenames) > 1:
+        for old_meta_filename in meta_filenames[1:]:
+            old_meta_path = os.path.join(path, old_meta_filename)
+            if os.path.exists(old_meta_path):
+                os.remove(old_meta_path)
+
+
+def import_content(srcdir, destdir, archive):
     """Discover content directories under ``srcdir`` using the first generation
     folder structure and copy them into ``destdir``, while dropping the old
     nested structure and putting them into a single folder which name is
     generated from the slugified title of the content."""
+    meta_filenames = archive.config['meta_filenames']
     for src_path in find_content_dirs(srcdir):
-        content_path = os.path.relpath(src_path, srcdir)
-        try:
-            meta = get_meta(srcdir, content_path, meta_filenames)
-        except ValidationError:
-            continue
-        else:
-            title = (safe_title(meta['title']) or
-                     safe_title(meta['url']) or
-                     get_random_title())
-            dest_path = os.path.join(destdir, title)
-            if not os.path.exists(dest_path):
-                shutil.copytree(src_path, dest_path)
+        meta = read_meta(src_path, meta_filenames)
+        if not meta:
+            continue  # metadata couldn't be found or read, skip this item
+
+        title = (safe_title(meta['title']) or
+                 safe_title(meta['url']) or
+                 get_random_title())
+        dest_path = os.path.join(destdir, title)
+        if not os.path.exists(dest_path):
+            shutil.copytree(src_path, dest_path)
+            upgrade_meta(meta)
+            meta_path = os.path.join(dest_path, meta_filenames[0])
+            with open(meta_path, 'w') as meta_file:
+                json.dump(meta, meta_file)
+            # delete any other meta files
+            delete_old_meta(dest_path, meta_filenames)
+            # add content to database
+            content_path = os.path.relpath(dest_path,
+                                           archive.config['contentdir'])
+            archive.add_to_archive(content_path)
