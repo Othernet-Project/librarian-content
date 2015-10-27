@@ -15,7 +15,7 @@ except NameError:
 
 
 HEX_PATH = r'(/[0-9a-f]{3}){10}/[0-9a-f]{2}$'  # md5-based dir path
-PUNCT = re.compile(r'[\t !"#$%&\':()*\-/<=>?@\[\\\]^_`{|},.]+')
+PUNCT = re.compile(r'[^a-zA-Z0-9]+')
 
 
 def fnwalk(path, fn, shallow=False):
