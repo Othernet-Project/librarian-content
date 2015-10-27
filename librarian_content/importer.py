@@ -1,7 +1,6 @@
 import os
 import re
 import shutil
-import unicodedata
 import uuid
 
 import scandir
@@ -15,7 +14,7 @@ except NameError:
 
 
 HEX_PATH = r'(/[0-9a-f]{3}){10}/[0-9a-f]{2}$'  # md5-based dir path
-PUNCT = re.compile(r'[^a-zA-Z0-9]+')
+ILLEGAL = re.compile(r'[\s!"#$%&\':()*\-/<=>?@\[\\\]^_`{|},.]+')
 
 
 def fnwalk(path, fn, shallow=False):
@@ -70,8 +69,7 @@ def get_random_title():
 
 def safe_title(source, delim=u' '):
     result = []
-    for word in PUNCT.split(source):
-        word = unicodedata.normalize('NFKD', word).encode('ascii', 'ignore')
+    for word in ILLEGAL.split(source):
         if word:
             result.append(word)
     return unicode(delim.join(result))
