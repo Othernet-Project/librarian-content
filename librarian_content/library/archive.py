@@ -209,8 +209,8 @@ class BaseArchive(object):
         try:
             self.fsal.remove(relpath)
         except Exception as exc:
-            logging.debug("Deletion of '{0}' failed: '{1}'".format(relpath,
-                                                                   exc))
+            logging.debug(u"Deletion of '{0}' failed: '{1}'".format(relpath,
+                                                                    exc))
             return False
         else:
             return True
@@ -229,14 +229,14 @@ class BaseArchive(object):
                 meta.pop(key, None)
 
     def __add_to_archive(self, relpath):
-        logging.debug("Adding content '{0}' to archive.".format(relpath))
+        logging.debug(u"Adding content '{0}' to archive.".format(relpath))
         meta_filenames = self.config['meta_filenames']
         contentdir = self.config['contentdir']
         try:
             meta = metadata.get_meta(contentdir, relpath, meta_filenames)
         except metadata.ValidationError as exc:
-            logging.debug("Metadata of '{0}' is invalid: '{1}'".format(relpath,
-                                                                       exc))
+            msg = u"Metadata of '{0}' is invalid: '{1}'".format(relpath, exc)
+            logging.debug(msg)
             return False
         else:
             self.__add_auto_fields(meta, relpath)
@@ -254,7 +254,7 @@ class BaseArchive(object):
         return sum([self.__add_to_archive(path) for path in relpaths])
 
     def __remove_from_archive(self, relpath):
-        msg = "Removing content '{0}' from archive.".format(relpath)
+        msg = u"Removing content '{0}' from archive.".format(relpath)
         logging.debug(msg)
         self.delete_content_files(relpath)
         return self.remove_meta_from_db(relpath)
