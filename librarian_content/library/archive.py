@@ -219,7 +219,9 @@ class BaseArchive(object):
         # add auto-generated values to metadata before writing into db
         meta['path'] = relpath
         meta['updated'] = utcnow()
-        meta['size'] = self.fsal.get_fso(relpath).size
+        (success, dir_fso) = self.fsal.get_fso(relpath)
+        # TODO: should we raise in this case?
+        meta['size'] = dir_fso.size if success else 0
         meta['content_type'] = metadata.determine_content_type(meta)
         # if cover or thumb images do not exist, avoid later filesystem lookups
         # by not writing the default paths into the storage
