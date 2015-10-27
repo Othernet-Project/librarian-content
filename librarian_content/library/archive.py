@@ -224,9 +224,11 @@ class BaseArchive(object):
         # if cover or thumb images do not exist, avoid later filesystem lookups
         # by not writing the default paths into the storage
         for key in ('cover', 'thumb'):
-            file_path = os.path.join(relpath, meta.get(key))
-            if not self.fsal.exists(file_path):
-                meta.pop(key, None)
+            filename = meta.get(key)
+            if filename:
+                file_path = os.path.join(relpath, filename)
+                if not self.fsal.exists(file_path):
+                    meta.pop(key, None)
 
     def __add_to_archive(self, relpath):
         logging.debug(u"Adding content '{0}' to archive.".format(relpath))
