@@ -19,7 +19,6 @@ setup(
     include_package_data=True,
     long_description=read('README.rst'),
     install_requires=[
-        'scandir',
         'outernet_metadata',
         'librarian_core',
         'fsal',
