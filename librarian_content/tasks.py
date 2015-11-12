@@ -19,10 +19,13 @@ def check_new_content(supervisor):
                             contentdir=config['library.contentdir'],
                             meta_filenames=config['library.metadata'])
     for event in supervisor.exts.fsal.get_changes():
+        path = os.path.dirname(event.src)
+        if path.startswith(config['library.legacy_destination']):
+            continue
+
         if is_content(event, config['library.metadata']):
-            content_path = os.path.dirname(event.src)
-            logging.info("New content has been discovered at: '{0}'. Adding it"
-                         " to the library...".format(content_path))
-            archive.add_to_archive(content_path)
+            logging.info(u"New content has been discovered at: '{0}'. Adding "
+                         "it to the library...".format(path))
+            archive.add_to_archive(path)
         else:
             supervisor.exts.events.publish('FS_EVENT', event)
