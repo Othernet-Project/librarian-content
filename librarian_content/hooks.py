@@ -28,5 +28,4 @@ def post_start(supervisor):
     refresh_rate = supervisor.config['library.refresh_rate']
     supervisor.exts.tasks.schedule(check_new_content,
                                    args=(supervisor,),
-                                   delay=refresh_rate,
-                                   periodic=True)
+                                   delay=refresh_rate)
