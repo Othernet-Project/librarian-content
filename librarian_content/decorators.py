@@ -24,7 +24,9 @@ def with_meta(abort_if_not_found=True):
                     abort(404)
                 return func(path=path, meta=None, **kwargs)
 
-            meta = metadata.Meta(content)
+            meta = metadata.Meta(request.app.supervisor,
+                                 content.path,
+                                 data=content)
             return func(path=path, meta=meta, **kwargs)
         return wrapper
     return decorator
