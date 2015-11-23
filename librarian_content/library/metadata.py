@@ -23,7 +23,6 @@ from . import adapters
 from .base import CDFObject
 
 
-SYSTEM_FILES = ('info.json', '.contentinfo', '.dirinfo')
 CONTENT_TYPE_EXTENSIONS = {
     'generic': ['*'],
     'html': ['html', 'htm'],
