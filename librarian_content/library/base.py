@@ -1,6 +1,7 @@
 from bottle_utils.common import to_bytes
 
 from librarian_core.contrib.cache.utils import generate_key
+from librarian_core.contrib.databases.utils import row_to_dict
 
 
 class CDFObject(object):
@@ -11,11 +12,15 @@ class CDFObject(object):
     """
     DATABASE_NAME = None
     CACHE_KEY_TEMPLATE = None
+    ATTEMPT_READ_FROM_FILE = True
+    ALLOW_EMPTY_INSTANCES = True
+
+    row_to_dict = staticmethod(row_to_dict)
 
     def __init__(self, supervisor, path, data=None):
         self.supervisor = supervisor
         self.path = path
-        self._data = data or dict()
+        self._data = row_to_dict(data or dict())
 
     def get_data(self):
         return self._data
@@ -72,16 +77,19 @@ class CDFObject(object):
         # assemble object instances from gathered data and store them in cache
         instances = dict()
         for (path, data) in entries.items():
-            obj = cls(supervisor, path, data)
-            instances[path] = obj
+            if data or cls.ALLOW_EMPTY_INSTANCES:
+                obj = cls(supervisor, path, data)
+                instances[path] = obj
             # cache only raw data, not object instance
             key = cls.get_cache_key(path)
             supervisor.exts.cache.set(key, data)
         # ids that were not found neither in cache, nor in the database are
         # scheduled to be read later from file
         for path in found.symmetric_difference(remaining):
-            supervisor.exts.tasks.schedule(cls.from_file,
-                                           args=(supervisor, path))
-            instances[path] = cls(supervisor, path)
+            if cls.ATTEMPT_READ_FROM_FILE:
+                supervisor.exts.tasks.schedule(cls.from_file,
+                                               args=(supervisor, path))
+            if cls.ALLOW_EMPTY_INSTANCES:
+                instances[path] = cls(supervisor, path)
 
         return instances
