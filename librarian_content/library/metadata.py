@@ -15,10 +15,12 @@ import json
 import os
 
 from bottle_utils.lazy import caching_lazy
-from librarian_core.utils import to_datetime
 from outernet_metadata import validator
 
+from librarian_core.utils import to_datetime
+
 from . import adapters
+from .base import CDFObject
 
 
 SYSTEM_FILES = ('info.json', '.contentinfo', '.dirinfo')
@@ -207,40 +209,40 @@ def determine_content_type(meta):
     return functools.reduce(calc, meta['content'].keys(), 0)
 
 
-class Meta(object):
+class Meta(CDFObject):
     """ Metadata wrapper with additional methods for easier consumption
 
     This classed is used as a dict wrapper that provides attrbute access to
     keys, and a few additional properties and methods to ease working with
     metadta.
     """
-    def __init__(self, meta):
-        """ Metadata wrapper instantiation
+    DATABASE_NAME = 'content'
+    TABLE_NAME = 'content'
+    CACHE_KEY_TEMPLATE = u'meta_{0}'
+    ATTEMPT_READ_FROM_FILE = False
+    ALLOW_EMPTY_INSTANCES = False
 
-        :param meta:          dict: Raw metadata as dict
-        """
-        self.meta = dict((key, meta[key]) for key in meta.keys())
-        # We use ``or`` in the following line because 'tags' can be an empty
-        # string, which is treated as invalid JSON
-        self.tags = json.loads(meta.get('tags') or '{}')
+    def __init__(self, *args, **kwargs):
+        super(Meta, self).__init__(*args, **kwargs)
+        self.tags = json.loads(self._data.get('tags') or '{}')
 
     def __getattr__(self, attr):
         try:
-            return self.meta[attr]
+            return self._data[attr]
         except KeyError:
             raise AttributeError("Attribute or key '%s' not found" % attr)
 
     def __getitem__(self, key):
-        return self.meta[key]
+        return self._data[key]
 
     def __setitem__(self, key, value):
-        self.meta[key] = value
+        self._data[key] = value
 
     def __delitem__(self, key):
-        del self.meta[key]
+        del self._data[key]
 
     def __contains__(self, key):
-        return key in self.meta
+        return key in self._data
 
     def get(self, key, default=None):
         """ Return the value of a metadata or the default value
@@ -251,19 +253,19 @@ class Meta(object):
         :param key:     name of the key to look up
         :param default: default value to use if key is missing
         """
-        return self.meta.get(key, default)
+        return self._data.get(key, default)
 
     @property
     def lang(self):
-        return self.meta.get('language')
+        return self._data.get('language')
 
     @property
     def label(self):
-        if self.meta.get('archive') == 'core':
+        if self._data.get('archive') == 'core':
             return 'core'
-        elif self.meta.get('is_sponsored'):
+        elif self._data.get('is_sponsored'):
             return 'sponsored'
-        elif self.meta.get('is_partner'):
+        elif self._data.get('is_partner'):
             return 'partner'
         return 'core'
 
@@ -271,4 +273,13 @@ class Meta(object):
     def content_type_names(self):
         """Return list of content type names present in a content object."""
         return [name for (name, cid) in CONTENT_TYPES.items()
-                if self.meta['content_type'] & cid == cid]
+                if self._data['content_type'] & cid == cid]
+
+    @classmethod
+    def fetch(cls, db, paths):
+        query = db.Select(sets=cls.TABLE_NAME, where=db.sqlin('path', paths))
+        db.query(query, *paths)
+        for row in db.results:
+            if row:
+                raw_data = cls.row_to_dict(row)
+                yield (raw_data['path'], raw_data)
