@@ -103,7 +103,6 @@ class EmbeddedArchive(BaseArchive):
 
     def __init__(self, fsal, db, **config):
         self.db = db
-        self.sqlin = lambda *args, **kw: self.db.sqlin.__func__(*args, **kw)
         super(EmbeddedArchive, self).__init__(fsal, **config)
 
     @to_dict
@@ -207,7 +206,7 @@ class EmbeddedArchive(BaseArchive):
     def get_multiple(self, relpaths, fields=None):
         q = self.db.Select(what=['*'] if fields is None else fields,
                            sets='content',
-                           where=self.sqlin('path', relpaths))
+                           where=self.db.sqlin('path', relpaths))
         self.db.query(q, *relpaths)
         return self.many()
 
@@ -304,7 +303,7 @@ class EmbeddedArchive(BaseArchive):
             self.db.executemany(q, ({'name': t} for t in tags))
 
         # Get the IDs of the tags
-        q = self.db.Select(sets='tags', where=self.sqlin('name', tags))
+        q = self.db.Select(sets='tags', where=self.db.sqlin('name', tags))
         self.db.query(q, *tags)
         tags = self.many()
         ids = (i['tag_id'] for i in tags)
@@ -332,7 +331,7 @@ class EmbeddedArchive(BaseArchive):
         with self.db.transaction():
             q = self.db.Delete('taggings',
                                where=['path = ?',
-                                      self.sqlin('tag_id', tag_ids)])
+                                      self.db.sqlin('tag_id', tag_ids)])
             self.db.query(q, meta.path, *tag_ids)
             q = self.db.Update('content', tags=':tags', where='path = :path')
             self.db.query(q, path=meta.path, tags=json.dumps(meta.tags))
