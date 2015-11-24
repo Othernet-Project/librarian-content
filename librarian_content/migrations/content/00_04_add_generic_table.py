@@ -1,7 +1,7 @@
 SQL = """
 create table generic
 (
-    path varchar primary_key unique not null,
+    path varchar primary key,
     description varchar
 );
 """

@@ -1,17 +1,17 @@
 SQL = """
 create table audio
 (
-    path varchar primary_key unique not null,
+    path varchar primary key,
     description varchar
 );
 
 create table playlist
 (
-    path varchar primary_key unique not null,
+    path varchar primary key,
     file varchar,
     title varchar,
     duration integer,
-    unique(path, file) on conflict replace
+    unique(path, file)
 );
 """
 

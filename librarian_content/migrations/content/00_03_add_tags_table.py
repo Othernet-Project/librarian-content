@@ -1,14 +1,14 @@
 SQL = """
 create table tags
 (
-    tag_id integer primary key asc,
-    name varchar not null unique on conflict ignore
+    tag_id serial primary key,
+    name varchar not null unique
 );
 create table taggings
 (
     tag_id integer,
     path varchar,
-    unique (tag_id, path) on conflict ignore
+    unique (tag_id, path)
 );
 """
 

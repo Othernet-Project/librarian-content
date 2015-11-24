@@ -1,7 +1,7 @@
 SQL = """
 create table app
 (
-    path varchar primary_key unique not null,
+    path varchar primary key,
     version varchar,
     description varchar
 );
