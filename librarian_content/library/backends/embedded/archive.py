@@ -157,10 +157,11 @@ class EmbeddedArchive(BaseArchive):
                                                  tag,
                                                  lang,
                                                  content_type)
-        return self.db.fetchone(q, dict(terms=terms,
-                                        tag_id=tag,
-                                        lang=lang,
-                                        content_type=content_type_id))
+        result = self.db.fetchone(q, dict(terms=terms,
+                                          tag_id=tag,
+                                          lang=lang,
+                                          content_type=content_type_id))
+        return result['count']
 
     def get_content(self, terms=None, offset=0, limit=0, tag=None, lang=None,
                     content_type=None):
