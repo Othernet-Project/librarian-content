@@ -231,11 +231,9 @@ class EmbeddedArchive(BaseArchive):
             else:
                 primitives[key] = value
 
-        where = 'AND'.join(['{} = {}'.format(k, v)
-                            for (k, v) in shared_data.items()])
         q = self.db.Replace(table_name,
-                            cols=primitives.keys(),
-                            where=where)
+                            constraints=shared_data.keys(),
+                            cols=primitives.keys())
         self.db.execute(q, primitives)
 
     def add_meta_to_db(self, metadata):
