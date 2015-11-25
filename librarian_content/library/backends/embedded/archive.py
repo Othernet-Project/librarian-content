@@ -95,6 +95,14 @@ class EmbeddedArchive(BaseArchive):
         'album': {}
     }
 
+    @to_dict
+    def one(self, *args, **kwargs):
+        return self.db.fetchone(*args, **kwargs)
+
+    @to_dict_list
+    def many(self, *args, **kwargs):
+        return self.db.fetchall(*args, **kwargs)
+
     def __init__(self, fsal, db, **config):
         self.db = db
         super(EmbeddedArchive, self).__init__(fsal, **config)
@@ -164,9 +172,9 @@ class EmbeddedArchive(BaseArchive):
                                                  terms,
                                                  lang,
                                                  content_type)
-        results = self.db.fetchall(q, dict(terms=terms,
-                                           lang=lang,
-                                           content_type=content_type_id))
+        results = self.many(q, dict(terms=terms,
+                                    lang=lang,
+                                    content_type=content_type_id))
         if results and content_type in self.prefetchable_types:
             for meta in results:
                 self._fetch(content_type, meta['path'], meta)
@@ -175,7 +183,7 @@ class EmbeddedArchive(BaseArchive):
 
     def _fetch(self, table, relpath, dest, many=False):
         q = self.db.Select(sets=table, where='path = %s')
-        fetcher = self.db.fetchone if not many else self.db.fetchall
+        fetcher = self.one if not many else self.many
         dest[table] = fetcher(q, (relpath,))
         for relation, related_tables in self.content_schema[table].items():
             for rel_table in related_tables:
@@ -186,7 +194,7 @@ class EmbeddedArchive(BaseArchive):
 
     def get_single(self, relpath):
         q = self.db.Select(sets='content', where='path = %s')
-        data = self.db.fetchone(q, (relpath,))
+        data = self.one(q, (relpath,))
         if data:
             for content_type, mask in metadata.CONTENT_TYPES.items():
                 if data['content_type'] & mask == mask:
@@ -197,7 +205,7 @@ class EmbeddedArchive(BaseArchive):
         q = self.db.Select(what=['*'] if fields is None else fields,
                            sets='content',
                            where=self.db.sqlin('path', relpaths))
-        return self.db.fetchall(q, relpaths)
+        return self.many(q, relpaths)
 
     def content_for_domain(self, domain):
         # TODO: tests
@@ -205,7 +213,7 @@ class EmbeddedArchive(BaseArchive):
                            where='url LIKE %(domain)s AND disabled = false',
                            order=CONTENT_ORDER)
         domain = '%' + domain.lower() + '%'
-        return self.db.fetchall(q, dict(domain=domain))
+        return self.many(q, dict(domain=domain))
 
     def _write(self, table_name, data, shared_data=None):
         data.update(shared_data)
