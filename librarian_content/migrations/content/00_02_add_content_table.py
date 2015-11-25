@@ -13,7 +13,6 @@ create table content
     archive varchar not null default 'core',
     publisher varchar,
     license varchar,
-    tags varchar,
     language varchar,
     size integer,
     broadcast date,

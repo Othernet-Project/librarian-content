@@ -9,7 +9,6 @@ file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 """
 
 import functools
-import json
 import logging
 
 from ...archive import BaseArchive, metadata
@@ -21,11 +20,6 @@ CONTENT_ORDER = ['-date(updated)', '-views']
 def multiarg(query, n):
     """ Returns version of query where '??' is replaced by n placeholders """
     return query.replace('??', ', '.join(['%s'] * n))
-
-
-def with_tag(q):
-    q.sets.natural_join('taggings')
-    q.where += 'tag_id = %(tag_id)s'
 
 
 class AttrDict(dict):
@@ -121,10 +115,7 @@ class EmbeddedArchive(BaseArchive):
                 if value is not None:
                     metadata[action.name] = value
 
-    def _add_filters(self, q, terms, tag, lang, content_type):
-        if tag:
-            with_tag(q)
-
+    def _add_filters(self, q, terms, lang, content_type):
         if lang:
             q.where += 'language = %(lang)s'
 
@@ -148,22 +139,20 @@ class EmbeddedArchive(BaseArchive):
 
         return (q, content_type_id)
 
-    def get_count(self, terms=None, tag=None, lang=None, content_type=None):
+    def get_count(self, terms=None, lang=None, content_type=None):
         q = self.db.Select('COUNT(*) as count',
                            sets='content',
                            where='disabled = false')
         (q, content_type_id) = self._add_filters(q,
                                                  terms,
-                                                 tag,
                                                  lang,
                                                  content_type)
         result = self.db.fetchone(q, dict(terms=terms,
-                                          tag_id=tag,
                                           lang=lang,
                                           content_type=content_type_id))
         return result['count']
 
-    def get_content(self, terms=None, offset=0, limit=0, tag=None, lang=None,
+    def get_content(self, terms=None, offset=0, limit=0, lang=None,
                     content_type=None):
         # TODO: tests
         q = self.db.Select(sets='content',
@@ -173,11 +162,9 @@ class EmbeddedArchive(BaseArchive):
                            offset=offset)
         (q, content_type_id) = self._add_filters(q,
                                                  terms,
-                                                 tag,
                                                  lang,
                                                  content_type)
         results = self.db.fetchall(q, dict(terms=terms,
-                                           tag_id=tag,
                                            lang=lang,
                                            content_type=content_type_id))
         if results and content_type in self.prefetchable_types:
@@ -259,8 +246,9 @@ class EmbeddedArchive(BaseArchive):
             logging.debug(msg)
             q = self.db.Delete('content', where='path = %s')
             rowcount = self.db.execute(q, (relpath,))
-            q = self.db.Delete('taggings', where='path = %s')
-            self.db.execute(q, (relpath,))
+            for table in self.content_schema.keys():
+                q = self.db.Delete(table, where='path = %s')
+                self.db.execute(q, (relpath,))
             return rowcount
 
     def clear_and_reload(self):
@@ -292,68 +280,6 @@ class EmbeddedArchive(BaseArchive):
         rowcount = self.db.execute(q, (relpath,))
         assert rowcount == 1, 'Updated more than one row'
         return rowcount
-
-    def add_tags(self, meta, tags):
-        """ Take content data and comma-separated tags and add the taggings """
-        if not tags:
-            return
-
-        # First ensure all tags exist
-        with self.db.transaction():
-            q = self.db.Insert('tags', cols=('name',))
-            self.db.executemany(q, ({'name': t} for t in tags))
-
-        # Get the IDs of the tags
-        q = self.db.Select(sets='tags', where=self.db.sqlin('name', tags))
-        tags = self.db.fetchall(q, tags)
-        ids = (i['tag_id'] for i in tags)
-
-        # Create taggings
-        pairs = ({'path': meta.path, 'tag_id': i} for i in ids)
-        tags_dict = {t['name']: t['tag_id'] for t in tags}
-        meta.tags.update(tags_dict)
-        with self.db.transaction():
-            q = self.db.Insert('taggings', cols=('tag_id', 'path'))
-            self.db.executemany(q, pairs)
-            q = self.db.Update('content',
-                               tags='%(tags)s',
-                               where='path = %(path)s')
-            self.db.execute(q, dict(path=meta.path,
-                                    tags=json.dumps(meta.tags)))
-
-        return tags
-
-    def remove_tags(self, meta, tags):
-        """ Take content data nad comma-separated tags and removed the
-        taggings """
-        if not tags:
-            return
-
-        tag_ids = [meta.tags[name] for name in tags]
-        meta.tags = dict((n, i) for n, i in meta.tags.items() if n not in tags)
-        with self.db.transaction():
-            q = self.db.Delete('taggings',
-                               where=['path = %s',
-                                      self.db.sqlin('tag_id', tag_ids)])
-            self.db.execute(q, [meta.path] + tag_ids)
-            q = self.db.Update('content',
-                               tags='%(tags)s',
-                               where='path = %(path)s')
-            self.db.execute(q, dict(path=meta.path,
-                                    tags=json.dumps(meta.tags)))
-
-    def get_tag_name(self, tag_id):
-        q = self.db.Select('name', sets='tags', where='tag_id = %s')
-        return self.db.fetchone(q, (tag_id,))
-
-    def get_tag_cloud(self):
-        q = self.db.Select(
-            ['name', 'tag_id', 'COUNT(taggings.tag_id) as count'],
-            sets=self.db.From('tags', 'taggings', join='NATURAL'),
-            group='taggings.tag_id',
-            order=['-count', 'name']
-        )
-        return self.db.fetchall(q)
 
     def needs_formatting(self, relpath):
         """ Whether content needs formatting patch """
