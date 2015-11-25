@@ -277,8 +277,7 @@ class Meta(CDFObject):
     @classmethod
     def fetch(cls, db, paths):
         query = db.Select(sets=cls.TABLE_NAME, where=db.sqlin('path', paths))
-        db.query(query, *paths)
-        for row in db.results:
+        for row in db.fetchiter(query, paths):
             if row:
                 raw_data = cls.row_to_dict(row)
                 yield (raw_data['path'], raw_data)
