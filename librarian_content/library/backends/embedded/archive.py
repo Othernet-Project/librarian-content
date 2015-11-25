@@ -128,7 +128,6 @@ class EmbeddedArchive(BaseArchive):
             q.where += 'language = %(lang)s'
 
         if terms:
-            terms = '%' + terms.lower() + '%'
             q.where += ('title LIKE %(terms)s OR '
                         'publisher LIKE %(terms)s OR '
                         'keywords LIKE %(terms)s')
@@ -155,6 +154,7 @@ class EmbeddedArchive(BaseArchive):
                                                  terms,
                                                  lang,
                                                  content_type)
+        terms = '%' + terms.lower() + '%'
         result = self.db.fetchone(q, dict(terms=terms,
                                           lang=lang,
                                           content_type=content_type_id))
@@ -172,6 +172,7 @@ class EmbeddedArchive(BaseArchive):
                                                  terms,
                                                  lang,
                                                  content_type)
+        terms = '%' + terms.lower() + '%'
         results = self.many(q, dict(terms=terms,
                                     lang=lang,
                                     content_type=content_type_id))
