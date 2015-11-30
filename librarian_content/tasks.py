@@ -8,7 +8,7 @@ REPEAT_DELAY = 3  # seconds
 
 
 def is_content(event, meta_filenames):
-    if not event.is_dir and event.event_type == 'created':
+    if not event.is_dir:
         filename = os.path.basename(event.src)
         return filename in meta_filenames
     return False
@@ -26,9 +26,14 @@ def check_new_content(supervisor):
         changes_found = True
         path = os.path.dirname(event.src)
         if is_content(event, config['library.metadata']):
-            logging.info(u"New content has been discovered at: '{0}'. Adding "
-                         "it to the library...".format(path))
-            archive.add_to_archive(path)
+            if event.event_type == 'created':
+                logging.info(u"New content has been discovered at: '{}'."
+                             " Adding it to the library...".format(path))
+                archive.add_to_archive(path)
+            elif event.event_type == 'deleted':
+                logging.info(u"Content removed from filesystem: '{}'."
+                             " Removing it from the library...".format(path))
+                archive.remove_from_archive(path)
         else:
             supervisor.exts.events.publish('FS_EVENT', event)
 
