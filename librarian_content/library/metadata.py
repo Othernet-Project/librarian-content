@@ -105,7 +105,7 @@ def replace_aliases(meta):
                     meta[key] = meta.pop(alias)
 
 
-def clean_keys(meta):
+def clean_keys(meta, specs=None):
     """ Make sure metadta dict does not have any non-standard keys
 
     This function modifies the metadata dict in-place, and always returns
@@ -113,10 +113,14 @@ def clean_keys(meta):
 
     :param meta:  metadata dict
     """
-    edge_keys = get_edge_keys()
-    for key in meta.keys():
-        if key not in edge_keys:
+    specs = specs or get_edge_keys()
+    for (key, value) in meta.items():
+        if key not in specs:
             del meta[key]
+        elif key == 'content':
+            for (ctype, data) in value.items():
+                type_specs = validator.values.TYPE_SPECS[ctype]
+                clean_keys(data, specs=type_specs)
 
 
 def detect_generation(meta):
