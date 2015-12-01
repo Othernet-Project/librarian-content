@@ -128,9 +128,9 @@ class EmbeddedArchive(BaseArchive):
             q.where += 'language = %(lang)s'
 
         if terms:
-            q.where += ('title LIKE %(terms)s OR '
-                        'publisher LIKE %(terms)s OR '
-                        'keywords LIKE %(terms)s')
+            q.where += ('title ILIKE %(terms)s OR '
+                        'publisher ILIKE %(terms)s OR '
+                        'keywords ILIKE %(terms)s')
 
         if content_type:
             # get integer representation of content type
