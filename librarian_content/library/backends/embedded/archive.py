@@ -251,7 +251,7 @@ class EmbeddedArchive(BaseArchive):
 
     def remove_meta_from_db(self, relpath):
         with self.db.transaction() as cur:
-            msg = "Removing {0} from archive database".format(relpath)
+            msg = u"Removing {0} from archive database".format(relpath)
             logging.debug(msg)
             q = self.db.Delete('content', where='path = %s')
             rowcount = self.db.execute(q, (relpath,))
