@@ -235,7 +235,6 @@ class EmbeddedArchive(BaseArchive):
 
     def add_meta_to_db(self, metadata):
         with self.db.transaction():
-            logging.debug("Adding new content to archive database")
             replaces = metadata.get('replaces')
             self._serialize(metadata, self.transformations)
             self._write('content',
@@ -251,8 +250,6 @@ class EmbeddedArchive(BaseArchive):
 
     def remove_meta_from_db(self, relpath):
         with self.db.transaction() as cur:
-            msg = u"Removing {0} from archive database".format(relpath)
-            logging.debug(msg)
             q = self.db.Delete('content', where='path = %s')
             rowcount = self.db.execute(q, (relpath,))
             for table in self.content_schema.keys():
