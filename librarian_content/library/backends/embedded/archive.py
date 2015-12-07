@@ -84,15 +84,36 @@ class EmbeddedArchive(BaseArchive):
             {'size': Rename('resolution')}
         ]}
     ]
-    content_schema = {
-        'generic': {},
-        'html': {},
-        'video': {},
-        'audio': {'many': ['playlist']},
-        'app': {},
-        'image': {'many': ['album']},
-        'playlist': {},
-        'album': {}
+    schema = {
+        'content': {
+            'constraints': ['path']
+        },
+        'generic': {
+            'constraints': ['path']
+        },
+        'html': {
+            'constraints': ['path']
+        },
+        'video': {
+            'constraints': ['path']
+        },
+        'audio': {
+            'relations': {'many': ['playlist']},
+            'constraints': ['path']
+        },
+        'app': {
+            'constraints': ['path']
+        },
+        'image': {
+            'relations': {'many': ['album']},
+            'constraints': ['path']
+        },
+        'playlist': {
+            'constraints': ['path', 'file']
+        },
+        'album': {
+            'constraints': ['path', 'file']
+        }
     }
 
     @to_dict
@@ -186,7 +207,8 @@ class EmbeddedArchive(BaseArchive):
         q = self.db.Select(sets=table, where='path = %s')
         fetcher = self.one if not many else self.many
         dest[table] = fetcher(q, (relpath,))
-        for relation, related_tables in self.content_schema[table].items():
+        relations = self.schema[table].get('relations', {})
+        for relation, related_tables in relations.items():
             for rel_table in related_tables:
                 self._fetch(rel_table,
                             relpath,
@@ -228,8 +250,9 @@ class EmbeddedArchive(BaseArchive):
             else:
                 primitives[key] = value
 
+        constraints = self.schema[table_name]['constraints']
         q = self.db.Replace(table_name,
-                            constraints=shared_data.keys(),
+                            constraints=constraints,
                             cols=primitives.keys())
         self.db.execute(q, primitives)
 
@@ -249,10 +272,10 @@ class EmbeddedArchive(BaseArchive):
         return True
 
     def remove_meta_from_db(self, relpath):
-        with self.db.transaction() as cur:
+        with self.db.transaction():
             q = self.db.Delete('content', where='path = %s')
             rowcount = self.db.execute(q, (relpath,))
-            for table in self.content_schema.keys():
+            for table in self.schema.keys():
                 q = self.db.Delete(table, where='path = %s')
                 self.db.execute(q, (relpath,))
             return rowcount
