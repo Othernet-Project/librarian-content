@@ -10,7 +10,7 @@ Installation
 The component has the following dependencies:
 
 - outernet_metadata_
-- librarian_core_
+- librarian-core_
 - fsal_
 
 To enable this component, add it to the list of components in librarian_'s
@@ -44,6 +44,6 @@ Configuration
         socket = /var/run/fsal.ctrl
 
 .. _librarian: https://github.com/Outernet-Project/librarian
-.. _librarian_core: https://github.com/Outernet-Project/librarian-core
+.. _librarian-core: https://github.com/Outernet-Project/librarian-core
 .. _outernet_metadata: https://github.com/Outernet-Project/outernet_metadata
 .. _fsal: https://github.com/Outernet-Project/fsal
