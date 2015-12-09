@@ -77,6 +77,8 @@ class EmbeddedArchive(BaseArchive):
     transformations = [
         {'content': Merge},
         {'replaces': Ignore},
+        {'archive': Ignore},
+        {'url': Ignore},
         {'video': [
             {'size': Rename('resolution')}
         ]},
