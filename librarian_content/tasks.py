@@ -1,3 +1,4 @@
+import functools
 import logging
 import os
 
@@ -14,6 +15,27 @@ def is_content(event, meta_filenames):
     return False
 
 
+def reschedule_content_check(fn):
+    @functools.wraps(fn)
+    def wrapper(supervisor):
+        try:
+            changes_found = fn(supervisor)
+        except Exception:
+            changes_found = False
+            raise
+        finally:
+            if changes_found:
+                refresh_rate = REPEAT_DELAY
+            else:
+                refresh_rate = supervisor.config['library.refresh_rate']
+
+            supervisor.exts.tasks.schedule(check_new_content,
+                                           args=(supervisor,),
+                                           delay=refresh_rate)
+    return wrapper
+
+
+@reschedule_content_check
 def check_new_content(supervisor):
     config = supervisor.config
     archive = Archive.setup(config['library.backend'],
@@ -39,10 +61,5 @@ def check_new_content(supervisor):
 
     if changes_found:
         supervisor.exts.cache.invalidate('content')
-        refresh_rate = REPEAT_DELAY
-    else:
-        refresh_rate = config['library.refresh_rate']
 
-    supervisor.exts.tasks.schedule(check_new_content,
-                                   args=(supervisor,),
-                                   delay=refresh_rate)
+    return changes_found
