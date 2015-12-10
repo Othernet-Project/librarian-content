@@ -232,14 +232,6 @@ class EmbeddedArchive(BaseArchive):
                            where=self.db.sqlin('path', relpaths))
         return self.many(q, relpaths)
 
-    def content_for_domain(self, domain):
-        # TODO: tests
-        q = self.db.Select(sets='content',
-                           where='url LIKE %(domain)s AND disabled = false',
-                           order=CONTENT_ORDER)
-        domain = '%' + domain.lower() + '%'
-        return self.many(q, dict(domain=domain))
-
     def _write(self, table_name, data, shared_data=None):
         data.update(shared_data)
         primitives = {}

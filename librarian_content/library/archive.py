@@ -130,15 +130,6 @@ class BaseArchive(object):
         :param fields:    list of fields to be fetched (defaults to all)"""
         raise NotImplementedError()
 
-    def content_for_domain(self, domain):
-        """Return iterable of content metadata partially matching the specified
-        domain.
-        Implementation is backend specific.
-
-        :param domain:  string
-        :returns:       iterable of matched contents"""
-        raise NotImplementedError()
-
     def add_meta_to_db(self, meta):
         """Add the passed in content metadata to the database.
         Implementation is backend specific.
