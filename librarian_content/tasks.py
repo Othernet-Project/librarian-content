@@ -6,6 +6,7 @@ from .library.archive import Archive
 
 
 REPEAT_DELAY = 3  # seconds
+INCREMENT_DELAY = 5  # surprisignly also seconds
 
 
 def is_content(event, meta_filenames):
@@ -17,7 +18,7 @@ def is_content(event, meta_filenames):
 
 def reschedule_content_check(fn):
     @functools.wraps(fn)
-    def wrapper(supervisor):
+    def wrapper(supervisor, current_delay):
         try:
             changes_found = fn(supervisor)
         except Exception:
@@ -27,10 +28,14 @@ def reschedule_content_check(fn):
             if changes_found:
                 refresh_rate = REPEAT_DELAY
             else:
-                refresh_rate = supervisor.config['library.refresh_rate']
+                max_delay = supervisor.config['library.refresh_rate']
+                if current_delay + INCREMENT_DELAY <= max_delay:
+                    refresh_rate = current_delay + INCREMENT_DELAY
+                else:
+                    refresh_rate = max_delay
 
             supervisor.exts.tasks.schedule(check_new_content,
-                                           args=(supervisor,),
+                                           args=(supervisor, refresh_rate),
                                            delay=refresh_rate)
     return wrapper
 
