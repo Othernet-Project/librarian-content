@@ -65,7 +65,6 @@ class Archive(object):
 class BaseArchive(object):
 
     required_config_params = (
-        'contentdir',
         'meta_filenames',
     )
     # list of content types that cannot be displayed on the mixed content list
@@ -226,9 +225,8 @@ class BaseArchive(object):
     def __add_to_archive(self, relpath):
         logging.debug(u"Adding content '{0}' to archive.".format(relpath))
         meta_filenames = self.config['meta_filenames']
-        contentdir = self.config['contentdir']
         try:
-            meta = metadata.get_meta(contentdir, relpath, meta_filenames)
+            meta = metadata.get_meta(self.fsal, relpath, meta_filenames)
         except metadata.ValidationError as exc:
             msg = u"Metadata of '{0}' is invalid: '{1}'".format(relpath, exc)
             logging.debug(msg)
@@ -257,7 +255,7 @@ class BaseArchive(object):
     @to_list
     def remove_from_archive(self, relpaths):
         """Removes the specified content(s) from the library.
-        Deletes the matching content files from `contentdir` and removes their
+        Deletes the matching content files from contentdir(s) and removes their
         meta information from the database.
 
         :param relpaths:  string: a single content path to be removed
@@ -279,7 +277,7 @@ class BaseArchive(object):
                 yield os.path.dirname(fs_obj.path)
 
     def reload_content(self):
-        """Reload all existing content from `contentdir` into database."""
+        """Reload all existing content from contentdir(s) into database."""
         return sum([self.__add_to_archive(path)
                     for path in self.find_content_dirs()])
 

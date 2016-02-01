@@ -94,7 +94,6 @@ class TestArchive(object):
 def base_archive():
     mocked_fsal = mock.Mock()
     return mod.BaseArchive(mocked_fsal,
-                           contentdir='contentdir',
                            meta_filenames=['metafile.ext'])
 
 
@@ -148,7 +147,7 @@ class TestBaseArchive(object):
         relpath = 'somewhere'
         add_meta_to_db.return_value = True
         assert base_archive._BaseArchive__add_to_archive(relpath)
-        get_meta.assert_called_once_with('contentdir',
+        get_meta.assert_called_once_with(base_archive.fsal,
                                          relpath,
                                          ['metafile.ext'])
         __add_auto_fields.assert_called_once_with(get_meta.return_value,
@@ -162,7 +161,7 @@ class TestBaseArchive(object):
         relpath = 'somewhere'
         get_meta.side_effect = mod.metadata.ValidationError('a', 'b')
         assert not base_archive._BaseArchive__add_to_archive(relpath)
-        get_meta.assert_called_once_with('contentdir',
+        get_meta.assert_called_once_with(base_archive.fsal,
                                          relpath,
                                          ['metafile.ext'])
         assert not add_meta_to_db.called

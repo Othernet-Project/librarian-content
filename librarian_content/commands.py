@@ -7,7 +7,6 @@ def refill_db(arg, supervisor):
     archive = Archive.setup(config['library.backend'],
                             supervisor.exts.fsal,
                             supervisor.exts.databases.content,
-                            contentdir=config['library.contentdir'],
                             meta_filenames=config['library.metadata'])
     archive.clear_and_reload()
     print('Content refill finished.')
@@ -20,7 +19,6 @@ def reload_db(arg, supervisor):
     archive = Archive.setup(config['library.backend'],
                             supervisor.exts.fsal,
                             supervisor.exts.databases.content,
-                            contentdir=config['library.contentdir'],
                             meta_filenames=config['library.metadata'])
     archive.reload_content()
     print('Content reload finished.')

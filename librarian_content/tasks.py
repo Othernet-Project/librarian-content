@@ -46,7 +46,6 @@ def check_new_content(supervisor):
     archive = Archive.setup(config['library.backend'],
                             supervisor.exts.fsal,
                             supervisor.exts.databases.content,
-                            contentdir=config['library.contentdir'],
                             meta_filenames=config['library.metadata'])
     changes_found = False
     for event in supervisor.exts.fsal.get_changes():

@@ -6,7 +6,6 @@ from .utils import ensure_dir
 
 
 def initialize(supervisor):
-    ensure_dir(supervisor.config['library.contentdir'])
     supervisor.exts.fsal = FSAL(supervisor.config['fsal.socket'])
     supervisor.exts.commands.register(
         'refill',

@@ -183,10 +183,10 @@ def process_meta(meta):
     return meta
 
 
-def get_meta(basedir, relpath, meta_filenames, encoding='utf8'):
+def get_meta(fsal, relpath, meta_filenames, encoding='utf8'):
     """Find a meta file at the specified path, read, parse, validate and
     then return it."""
-    meta_paths = (os.path.abspath(os.path.join(basedir, relpath, filename))
+    meta_paths = (os.path.join(basedir, relpath, filename)
                   for filename in meta_filenames)
     try:
         (path,) = [path for path in meta_paths if os.path.exists(path)]
