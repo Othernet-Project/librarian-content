@@ -59,7 +59,7 @@ def check_new_content(supervisor):
             elif event.event_type == 'deleted':
                 logging.info(u"Content removed from filesystem: '{}'."
                              " Removing it from the library...".format(path))
-                archive.remove_from_archive(path)
+                archive.remove_from_archive(path, delete_files=False)
         else:
             supervisor.exts.events.publish('FS_EVENT', event)
 
