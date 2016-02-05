@@ -246,14 +246,15 @@ class BaseArchive(object):
         """
         return sum([self.__add_to_archive(path) for path in relpaths])
 
-    def __remove_from_archive(self, relpath):
+    def __remove_from_archive(self, relpath, delete_files):
         msg = u"Removing content '{0}' from archive.".format(relpath)
         logging.debug(msg)
-        self.delete_content_files(relpath)
+        if delete_files:
+            self.delete_content_files(relpath)
         return self.remove_meta_from_db(relpath)
 
     @to_list
-    def remove_from_archive(self, relpaths):
+    def remove_from_archive(self, relpaths, delete_files=False):
         """Removes the specified content(s) from the library.
         Deletes the matching content files from contentdir(s) and removes their
         meta information from the database.
@@ -261,7 +262,8 @@ class BaseArchive(object):
         :param relpaths:  string: a single content path to be removed
                           iterable: an iterable of content paths to be removed
         :returns:         int: successfully removed content count"""
-        return sum([self.__remove_from_archive(path) for path in relpaths])
+        return sum([self.__remove_from_archive(path, delete_files)
+                    for path in relpaths])
 
     def find_content_dirs(self, relative=True):
         """Find all content directories within basedir"""
