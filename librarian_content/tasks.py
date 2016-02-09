@@ -3,6 +3,7 @@ import logging
 import os
 
 from .library.archive import Archive
+from .library.facets.archive import FacetsArchive
 
 
 REPEAT_DELAY = 3  # seconds
@@ -47,10 +48,20 @@ def check_new_content(supervisor):
                             supervisor.exts.fsal,
                             supervisor.exts.databases.content,
                             meta_filenames=config['library.metadata'])
+    facets_archive = FacetsArchive(supervisor.exts.fsal,
+                                   supervisor.exts.databases.facets,
+                                   config=config)
     changes_found = False
     for event in supervisor.exts.fsal.get_changes():
         changes_found = True
+        if event.event_type == 'created':
+            logging.info(u"Adding file to facet : '{}'".format(event.src))
+            facets_archive.add_to_facets(event.src)
+        elif event.event_type == 'deleted':
+            logging.info(u"Removing file from facet".format(event.src))
+            facets_archive.remove_from_facets(event.src)
         path = os.path.dirname(event.src)
+
         if is_content(event, config['library.metadata']):
             if event.event_type == 'created':
                 logging.info(u"New content has been discovered at: '{}'."
