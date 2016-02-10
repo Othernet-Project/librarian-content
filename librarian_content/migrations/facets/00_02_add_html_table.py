@@ -2,7 +2,9 @@ SQL = """
 create table html
 (
     path varchar primary key,
-    index varchar not null
+    index varchar not null,
+
+    unique(path, index)
 );
 """
 

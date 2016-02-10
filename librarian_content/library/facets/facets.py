@@ -52,6 +52,9 @@ class Facets(CDFObject):
     def get(self, key, default=None):
         return self._data.get(key, default)
 
+    def keys(self):
+        return self._data.keys()
+
     def items(self):
         return self._data.items()
 

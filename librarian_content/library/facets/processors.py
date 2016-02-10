@@ -1,8 +1,11 @@
 import os
+import logging
 
 import mutagen.mp3
 from PIL import Image
 from iptcinfo import IPTCInfo
+
+from fsal.client import OpenError
 
 
 def split_name(fname):
@@ -35,13 +38,13 @@ class FacetProcessorBase(object):
         self.fsal = fsal
         self.basepath = basepath
 
-    def add_file(self, relpath):
+    def add_file(self, facets, relpath):
         pass
 
-    def remove_file(self, relpath):
+    def remove_file(self, facets, relpath):
         pass
 
-    def change_file(self, relpath):
+    def update_file(self, facets, relpath):
         pass
 
     @classmethod
@@ -50,6 +53,25 @@ class FacetProcessorBase(object):
             extensions = list(getattr(cls, 'EXTENSIONS'))
             return get_extension(relpath) in extensions
         return False
+
+
+class GenericFacetProcessor(FacetProcessorBase):
+
+    def add_file(self, facets, relpath):
+        return self._process(facets, relpath)
+
+    def remove_file(self, facets, relpath):
+        return self._process(facets, relpath)
+
+    def update_file(self, facets, relpath):
+        return self._process(facets, relpath)
+
+    def _process(self, facets, relpath):
+        facets['generic'] = {'path': relpath}
+
+    @classmethod
+    def can_process(cls, basepath, relpath):
+        return True
 
 
 class HtmlFacetProcessor(FacetProcessorBase):
@@ -67,14 +89,14 @@ class HtmlFacetProcessor(FacetProcessorBase):
             if 'index' in index_name:
                 # Nothing to do anymore
                 return
-        self._find_index()
+        self._find_index(facets)
 
-    def remove_file(self, relpath):
+    def remove_file(self, facets, relpath):
         if facets['html']['index'] == relpath:
             del facets['html']
-            self._find_index()
+            self._find_index(facets)
 
-    def _find_index(self):
+    def _find_index(self, facets):
         (success, dirs, files) = self.fsal.list_dir(facets['path'])
         index_path = None
         path_priority = 100
@@ -107,10 +129,14 @@ class ImageFacetProcessor(FacetProcessorBase):
     def get_image_metadata(self, relpath):
         path = os.path.join(self.basepath, relpath)
         title = None
-        with self.fsal.open(path, 'rb') as f:
-            width, height = Image.open(f).size
-        with self.fsal.open(path, 'rb') as f:
-            title_exif = self._get_image_metadata_exif(f)
+        try:
+            with self.fsal.open(path, 'rb') as f:
+                width, height = Image.open(f).size
+            with self.fsal.open(path, 'rb') as f:
+                title_exif = self._get_image_metadata_exif(f)
+        except OpenError:
+            # File no longer exists on the storage(s). Do nothing
+            pass
 
         title = title_exif or ''
         return {
@@ -133,18 +159,24 @@ class ImageFacetProcessor(FacetProcessorBase):
             facets['image'] = { 'gallery': gallery }
 
     def remove_file(self, facets, relpath):
-        #TODO: Implement this
-        pass
+        image_f = facets.get('image', dict())
+        gallery = image_f.get('gallery', list())
+        gallery[:] = [entry for entry in gallery if entry['file'] != relpath]
+        logging.debug(gallery)
+        facets['image'] = { 'gallery': gallery }
 
     def _get_image_metadata_exif(self, fileobj):
-        image = Image.open(fileobj)
         title = ''
-        if image.format in ['JPG', 'TIFF']:
-            exif_data = image._getexif()
-            if exif_data:
-                title = exif_data.get(self.EXIF_TITLE_TAG, '')
+        try:
+            image = Image.open(fileobj)
+            if image.format in ['JPG', 'TIFF']:
+                exif_data = image._getexif()
+                if exif_data:
+                    title = exif_data.get(self.EXIF_TITLE_TAG, '')
+        except IOError:
+            # File no longer exists do nothing
+            pass
         return title
-
 
     def _get_image_metadata_iptc(self, fileobj):
         title = ''
@@ -178,7 +210,7 @@ class AudioFacetProcessor(FacetProcessorBase):
 
     def add_file(self, facets, relpath):
         audio_facet = facets.get('audio', dict())
-        playlist = image_f.get('playlist', list())
+        playlist = audio_facet.get('playlist', list())
         for f in playlist:
             if f['file'] == relpath:
                 self.update_file(facets, relpath)
@@ -193,12 +225,14 @@ class AudioFacetProcessor(FacetProcessorBase):
         pass
 
     def _get_mp3_metadata(self, relpath):
-        path = self.fsal.get_fso(relpath).path
-        mp3 = mutagen.mp3.MP3(path)
-        duration = mp3.info.length
-        #TODO Use fallback tags
-        id3_tope = mp3.tags.get('TOPE')
-        id3_tit2 = mp3.tags.get('TIT2')
-        artist = id3_tope[0] if id3_tope else ''
-        title = id3_tit2[0] if id3_tit2 else ''
+        artist, title, duration = ('', '', 0)
+        success, fso = self.fsal.get_fso(relpath)
+        if success:
+            mp3 = mutagen.mp3.MP3(fso.path)
+            duration = mp3.info.length
+            #TODO Use fallback tags
+            id3_tope = mp3.tags.get('TOPE')
+            id3_tit2 = mp3.tags.get('TIT2')
+            artist = id3_tope[0] if id3_tope else ''
+            title = id3_tit2[0] if id3_tit2 else ''
         return (artist, title, duration)

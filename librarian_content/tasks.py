@@ -58,7 +58,7 @@ def check_new_content(supervisor):
             logging.info(u"Adding file to facet : '{}'".format(event.src))
             facets_archive.add_to_facets(event.src)
         elif event.event_type == 'deleted':
-            logging.info(u"Removing file from facet".format(event.src))
+            logging.info(u"Removing file from facet: '{}'".format(event.src))
             facets_archive.remove_from_facets(event.src)
         path = os.path.dirname(event.src)
 
