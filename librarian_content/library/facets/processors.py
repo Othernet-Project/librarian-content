@@ -162,7 +162,6 @@ class ImageFacetProcessor(FacetProcessorBase):
         image_f = facets.get('image', dict())
         gallery = image_f.get('gallery', list())
         gallery[:] = [entry for entry in gallery if entry['file'] != relpath]
-        logging.debug(gallery)
         facets['image'] = { 'gallery': gallery }
 
     def _get_image_metadata_exif(self, fileobj):
@@ -221,8 +220,10 @@ class AudioFacetProcessor(FacetProcessorBase):
             facets['audio'].update({ 'playlist': playlist })
 
     def remove_file(self, facets, relpath):
-        #TODO: Implement this
-        pass
+        audio_facet = facets.get('audio', dict())
+        playlist = audio_facet.get('playlist', list())
+        playlist[:] = [entry for entry in playlist if entry['file'] != relpath]
+        facets['audio'] = { 'playlist': playlist }
 
     def _get_mp3_metadata(self, relpath):
         artist, title, duration = ('', '', 0)
