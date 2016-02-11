@@ -161,16 +161,17 @@ class FacetsArchive(object):
                 if isinstance(value, dict):
                     self._write(key, old_value, value, shared_data=shared_data)
                 elif isinstance(value, list):
-                    #TODO: Optimize to find difference between old list and new
-                    if old_value:
-                        for row in old_value:
+                    # For an items present in the old list but not in new list
+                    # write them out
+                    for row in old_value or list():
+                        if row not in value:
                             self._write(key, row, None, shared_data=shared_data)
                     for row in value:
-                        self._write(key, None, row, shared_data=shared_data)
+                        old_row = row if old_value and row in old_value else None
+                        self._write(key, old_row, row, shared_data=shared_data)
                 else:
                     new_primitives[key] = value
-                    if old_data:
-                        old_primitives[key] = old_value
+                    old_primitives[key] = old_value
 
             if old_data:
                 # Delete all entries which should no longer exist
