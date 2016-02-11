@@ -165,7 +165,7 @@ class FacetsArchive(object):
                     # write them out
                     for row in old_value or list():
                         if row not in value:
-                            self._write(key, row, None, shared_data=shared_data)
+                            self._remove(key, row)
                     for row in value:
                         old_row = row if old_value and row in old_value else None
                         self._write(key, old_row, row, shared_data=shared_data)
@@ -180,7 +180,7 @@ class FacetsArchive(object):
                 removed_keys = old_keys - (old_keys.intersection(new_keys))
                 for key in removed_keys:
                     value = old_data[key]
-                    self._write(key, value, None, shared_data=shared_data)
+                    self._remove(key, value)
 
             if old_primitives != new_primitives:
                 constraints = self.schema[table_name]['constraints']
@@ -189,13 +189,17 @@ class FacetsArchive(object):
                                     cols=new_primitives.keys())
                 self.db.execute(q, new_primitives)
         else:
+            self._remove(table_name, old_data)
+
+    def _remove(self, table_name, old_data):
+        if old_data:
             primitives = {}
             for key, value in old_data.items():
                 if isinstance(value, dict):
-                    self._write(key, value, None, shared_data=shared_data)
+                    self._remove(key, value)
                 elif isinstance(value, list):
                     for row in value:
-                        self._write(key, row, None, shared_data=shared_data)
+                        self._remove(key, row)
                 else:
                     primitives[key] = value
             q = self.db.Delete(table_name)
