@@ -59,6 +59,7 @@ class FacetsArchive(object):
             'constraints': ['path', 'index']
         },
         'video': {
+            'relations': {'many': ['clips']},
             'constraints': ['path']
         },
         'audio': {
@@ -76,7 +77,11 @@ class FacetsArchive(object):
         'gallery': {
             'constraints': ['path', 'file'],
             'order': ['file']
-        }
+        },
+        'clips': {
+            'constraints': ['path', 'file'],
+            'order': ['file']
+        },
     }
 
     def __init__(self, fsal, db, config):

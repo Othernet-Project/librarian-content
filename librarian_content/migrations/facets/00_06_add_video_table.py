@@ -1,17 +1,18 @@
 SQL = """
-create table audio
+create table video
 (
-    path varchar primary key,
-    cover varchar
+    path varchar primary key
 );
 
-create table playlist
+create table clips
 (
     path varchar,
     file varchar,
-    artist varchar,
     title varchar,
     duration integer,
+    width integer,
+    height integer,
+    thumbnail varchar,
     unique(path, file)
 );
 """

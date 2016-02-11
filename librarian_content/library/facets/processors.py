@@ -1,9 +1,13 @@
 import os
 import logging
 
+from bottle_utils.common import to_unicode
+
 import mutagen.mp3
 from PIL import Image
 from iptcinfo import IPTCInfo
+from hachoir_parser import createParser
+from hachoir_metadata import extractMetadata
 
 from fsal.client import OpenError
 
@@ -217,7 +221,7 @@ class AudioFacetProcessor(FacetProcessorBase):
         else:
             audio_metadata = self.get_audio_metadata(relpath)
             playlist.append(audio_metadata)
-            facets['audio'].update({ 'playlist': playlist })
+            facets['audio'] = { 'playlist': playlist }
 
     def remove_file(self, facets, relpath):
         audio_facet = facets.get('audio', dict())
@@ -237,3 +241,57 @@ class AudioFacetProcessor(FacetProcessorBase):
             artist = id3_tope[0] if id3_tope else ''
             title = id3_tit2[0] if id3_tit2 else ''
         return (artist, title, duration)
+
+
+class VideoFacetProcessor(FacetProcessorBase):
+    EXTENSIONS = ['mp4', 'wmv', 'webm', 'flv', 'ogv']
+
+    def get_video_metadata(self, relpath):
+        title = ''
+        duration = 0
+        width, height = (0, 0)
+        #TODO: Thumbnail extraction
+        thumbnail = ''
+        path = os.path.join(self.basepath, relpath)
+        title, duration, width, height = self._get_metadata(path)
+        return {
+            'file': relpath,
+            'title': title,
+            'duration': duration,
+            'width': width,
+            'height': height,
+            'thumbnail': thumbnail,
+        }
+
+    def add_file(self, facets, relpath):
+        video_facet = facets.get('video', dict())
+        clips = video_facet.get('clips', list())
+        for f in clips:
+            if f['file'] == relpath:
+                self.update_file(facets, relpath)
+                return
+        else:
+            video_metadata = self.get_video_metadata(relpath)
+            clips.append(video_metadata)
+            facets['video'] = { 'clips': clips }
+
+    def remove_file(self, facets, relpath):
+        video_facet = facets.get('video', dict())
+        clips = video_facet.get('clips', list())
+        clips[:] = [entry for entry in clips if entry['file'] != relpath]
+        facets['video'] = { 'clips': clips }
+
+    def _get_metadata(self, path):
+        title, duration, width, height = ('', 0, 0, 0)
+        success, fso = self.fsal.get_fso(path)
+        if success:
+            parser = createParser(to_unicode(fso.path))
+            metadata = extractMetadata(parser)
+            title = metadata.get('title', '')
+            duration = metadata.get('duration', 0)
+            if duration:
+                duration = int(duration.total_seconds())
+            width = metadata.get('width', 0)
+            height = metadata.get('height', 0)
+
+        return (title, duration, width, height)
