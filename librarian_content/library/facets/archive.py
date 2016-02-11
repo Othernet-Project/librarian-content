@@ -200,5 +200,5 @@ class FacetsArchive(object):
                     primitives[key] = value
             q = self.db.Delete(table_name)
             for key in primitives.keys():
-                q.where |= '{0} = %({0})s'.format(key)
+                q.where &= '{0} = %({0})s'.format(key)
             self.db.execute(q, primitives)
