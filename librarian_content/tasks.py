@@ -2,6 +2,8 @@ import functools
 import logging
 import os
 
+from fsal.events import EVENT_CREATED, EVENT_DELETED, EVENT_MODIFIED
+
 from .library.archive import Archive
 from .library.facets.archive import FacetsArchive
 
@@ -54,14 +56,17 @@ def check_new_content(supervisor):
     changes_found = False
     for event in supervisor.exts.fsal.get_changes():
         changes_found = True
-        if event.event_type == 'created':
-            logging.info(u"Adding file to facet : '{}'".format(event.src))
+        if event.is_dir and event.event_type == EVENT_DELETED:
+            logging.info(u"Removing path from facets archive: '{}'".format(event.src))
+            facets_archive.remove_facets(event.src)
+        elif event.event_type == EVENT_CREATED:
+            logging.info(u"Adding file to facet archive: '{}'".format(event.src))
             facets_archive.add_to_facets(event.src)
-        elif event.event_type == 'deleted':
+        elif event.event_type == EVENT_DELETED:
             logging.info(u"Removing file from facet: '{}'".format(event.src))
             facets_archive.remove_from_facets(event.src)
-        path = os.path.dirname(event.src)
 
+        path = os.path.dirname(event.src)
         if is_content(event, config['library.metadata']):
             if event.event_type == 'created':
                 logging.info(u"New content has been discovered at: '{}'."

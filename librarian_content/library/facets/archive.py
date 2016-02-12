@@ -47,6 +47,14 @@ def to_dict_list(func):
     return wrapper
 
 
+def update_facets(facets):
+    facet_types = 0
+    for k, v in FACET_TYPES.items():
+        if k in facets:
+            facet_types |= v
+    facets['facet_types'] = facet_types
+
+
 class FacetsArchive(object):
     schema = {
         'facets': {
@@ -100,20 +108,36 @@ class FacetsArchive(object):
     def add_to_facets(self, path):
         root = os.path.dirname(path)
         relpath = os.path.relpath(path, root)
-        current_facets = self.get_facets(root)
+        current_facets = self.get_or_init_facets(root)
         new_facets = copy.deepcopy(current_facets)
         for processor in get_facet_processors(self.fsal, root, relpath):
             processor.add_file(new_facets, relpath)
+        update_facets(new_facets)
         self.save_facets(current_facets, new_facets)
 
     def remove_from_facets(self, path):
         root = os.path.dirname(path)
         relpath = os.path.relpath(path, root)
         current_facets = self.get_facets(root)
-        new_facets = copy.deepcopy(current_facets)
-        for processor in get_facet_processors(self.fsal, root, relpath):
-            processor.remove_file(new_facets, relpath)
-        self.save_facets(current_facets, new_facets)
+        if current_facets:
+            new_facets = copy.deepcopy(current_facets)
+            for processor in get_facet_processors(self.fsal, root, relpath):
+                processor.remove_file(new_facets, relpath)
+            update_facets(new_facets)
+            self.save_facets(current_facets, new_facets)
+
+    def remove_facets(self, path):
+        facets = self.get_facets(path)
+        if facets:
+            self._remove_facets(facets)
+
+    def get_or_init_facets(self, path):
+        facets = self.get_facets(path)
+        if not facets:
+            data = {'path': path}
+            facets = Facets(supervisor=None, path=None, data=data)
+        update_facets(facets)
+        return facets
 
     def get_facets(self, path):
         q = self.db.Select(sets='facets', where='path = %s')
@@ -122,16 +146,11 @@ class FacetsArchive(object):
             for facet_type, mask in FACET_TYPES.items():
                 if data['facet_types'] & mask == mask:
                     self._fetch(facet_type, path, data)
+            return Facets(supervisor=None, path=None, data=data)
         else:
-            data = {'path': path}
-        return Facets(supervisor=None, path=None, data=data)
+            return None
 
     def save_facets(self, old_facets, new_facets):
-        facet_types = 0
-        for k, v in FACET_TYPES.items():
-            if k in new_facets:
-                facet_types |= v
-        new_facets['facet_types'] = facet_types
 
         with self.db.transaction():
             self._write('facets', old_facets, new_facets, shared_data={'path': new_facets['path']})
@@ -206,3 +225,7 @@ class FacetsArchive(object):
             for key in primitives.keys():
                 q.where &= '{0} = %({0})s'.format(key)
             self.db.execute(q, primitives)
+
+        def _remove_facets(self, facets):
+            with self.db.transaction():
+                self._remove('facets', facets)
