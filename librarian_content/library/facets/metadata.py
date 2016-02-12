@@ -1,9 +1,30 @@
 import logging
 import datetime
+import functools
+import itertools
 
 from bottle_utils.common import to_unicode
 from hachoir_parser import createParser
 from hachoir_metadata import extractMetadata
+
+
+def meta_tags(tags, default=None, transform=None):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(self):
+            items = (self._meta.getItem(tag, 0) for tag in tags)
+            values = (item.value for item in items if item)
+            transformed = itertools.imap(transform, values)
+            value = next(transformed, default)
+            return value
+        return wrapper
+    return decorator
+
+
+def to_seconds(duration):
+    if isinstance(duration, datetime.timedelta):
+        duration = int(duration.total_seconds())
+    return duration
 
 
 class BaseMetadata(object):
@@ -35,19 +56,63 @@ class HachoirMetadataWrapper(BaseMetadata):
             raise
 
     def get(self, key, default=None):
-        value = self._meta.get(key, default)
-        if key == 'duration' and isinstance(value, datetime.timedelta):
-            value = int(value.total_seconds())
-        return value
+        return self._meta.get(key, default)
 
 
 class ImageMetadata(HachoirMetadataWrapper):
-    pass
+
+    @property
+    @meta_tags(tags=('title',), default='')
+    def title(self):
+        pass
+
+    @property
+    @meta_tags(tags=('width'), default=0)
+    def width(self):
+        pass
+
+    @property
+    @meta_tags(tags=('height',), default=0)
+    def height(self):
+        pass
 
 
 class AudioMetadata(HachoirMetadataWrapper):
-    pass
+
+    @property
+    @meta_tags(tags=('artist', 'author'), default='')
+    def artist(self):
+        pass
+
+    @property
+    @meta_tags(tags=('title',), default='')
+    def title(self):
+        pass
+
+    @property
+    @meta_tags(tags=('duration',), default=0, transform=to_seconds)
+    def duration(self):
+        pass
 
 
 class VideoMetadata(HachoirMetadataWrapper):
-    pass
+
+    @property
+    @meta_tags(tags=('title',), default='')
+    def title(self):
+        pass
+
+    @property
+    @meta_tags(tags=('width'), default=0)
+    def width(self):
+        pass
+
+    @property
+    @meta_tags(tags=('height',), default=0)
+    def height(self):
+        pass
+
+    @property
+    @meta_tags(tags=('duration',), default=0, transform=to_seconds)
+    def duration(self):
+        pass

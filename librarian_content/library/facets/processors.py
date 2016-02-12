@@ -186,9 +186,9 @@ class ImageFacetProcessor(FacetProcessorBase):
         meta = ImageMetadata(self.fsal, path)
         return {
             'file': relpath,
-            'title': meta.get('title', ''),
-            'width': meta.get('width', 0),
-            'height': meta.get('height', 0)
+            'title': meta.title,
+            'width': meta.width,
+            'height': meta.height
         }
 
 
@@ -228,9 +228,9 @@ class AudioFacetProcessor(FacetProcessorBase):
         meta = AudioMetadata(self.fsal, path)
         return {
             'file': relpath,
-            'artist': meta.get('artist', ''),
-            'title': meta.get('title', ''),
-            'duration': meta.get('duration', 0)
+            'artist': meta.artist,
+            'title': meta.title,
+            'duration': meta.duration
         }
 
 
@@ -266,13 +266,13 @@ class VideoFacetProcessor(FacetProcessorBase):
 
     def _get_metadata(self, relpath):
         path = os.path.join(self.basepath, relpath)
-        meta = ImageMetadata(self.fsal, path)
+        meta = VideoMetadata(self.fsal, path)
         return {
             'file': relpath,
-            'title': meta.get('title', ''),
-            'width': meta.get('width', 0),
-            'height': meta.get('height', 0),
-            'duration': meta.get('duration', 0),
+            'title': meta.title,
+            'width': meta.width,
+            'height': meta.height,
+            'duration': meta.duration,
             #TODO: Thumbnail generation
             'thumbnail': '',
         }
