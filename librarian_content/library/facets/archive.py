@@ -10,7 +10,6 @@ file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 
 import os
 import copy
-import logging
 import functools
 
 from .facets import Facets, FACET_TYPES
@@ -151,7 +150,6 @@ class FacetsArchive(object):
             return None
 
     def save_facets(self, old_facets, new_facets):
-
         with self.db.transaction():
             self._write('facets', old_facets, new_facets, shared_data={'path': new_facets['path']})
         return True

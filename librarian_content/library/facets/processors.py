@@ -1,16 +1,7 @@
 import os
-import logging
+import functools
 
-from bottle_utils.common import to_unicode
-
-import mutagen.mp3
-from PIL import Image
-from iptcinfo import IPTCInfo
-from hachoir_parser import createParser
-from hachoir_metadata import extractMetadata
-
-from fsal.client import OpenError
-
+from .metadata import ImageMetadata, AudioMetadata, VideoMetadata
 
 def split_name(fname):
     name, ext = os.path.splitext(fname)
@@ -37,19 +28,49 @@ def get_facet_processors(fsal, dir_path, file_path):
     return valid_processors
 
 
+#TODO: Remove this after facets become stable
+def log_facets(prefix, facets):
+    import pprint
+    import logging
+    logging.debug('{} {}'.format(prefix, pprint.pformat(dict(facets))))
+
+
+def cleanup(func):
+    @functools.wraps(func)
+    def wrapper(self, facets, path):
+        result = func(self, facets, path)
+        _cleanup(facets)
+        return result
+    return wrapper
+
+
+def _cleanup(data):
+    for key, value in data.items():
+        if isinstance(value, list):
+            for row in value:
+                _cleanup(row)
+            value[:] = [row for row in value if row]
+            if not value:
+                del data[key]
+        elif isinstance(value, dict):
+            _cleanup(value)
+            if not value:
+                del data[key]
+
+
 class FacetProcessorBase(object):
     def __init__(self, fsal, basepath):
         self.fsal = fsal
         self.basepath = basepath
 
     def add_file(self, facets, relpath):
-        pass
+        raise NotImplementedError()
 
     def remove_file(self, facets, relpath):
-        pass
+        raise NotImplementedError()
 
     def update_file(self, facets, relpath):
-        pass
+        raise NotImplementedError()
 
     @classmethod
     def can_process(cls, basepath, relpath):
@@ -71,7 +92,7 @@ class GenericFacetProcessor(FacetProcessorBase):
         return self._process(facets, relpath)
 
     def _process(self, facets, relpath):
-        facets['generic'] = {'path': relpath}
+        facets['generic'] = {'path': self.basepath}
 
     @classmethod
     def can_process(cls, basepath, relpath):
@@ -87,6 +108,7 @@ class HtmlFacetProcessor(FacetProcessorBase):
         'start': 3,
     }
 
+    @cleanup
     def add_file(self, facets, relpath):
         if 'html' in facets:
             index_name = os.path.basename(facets['html']['index'])
@@ -95,6 +117,10 @@ class HtmlFacetProcessor(FacetProcessorBase):
                 return
         self._find_index(facets)
 
+    def update_file(self, facets, relpath):
+        pass
+
+    @cleanup
     def remove_file(self, facets, relpath):
         if facets['html']['index'] == relpath:
             del facets['html']
@@ -128,170 +154,125 @@ class HtmlFacetProcessor(FacetProcessorBase):
 class ImageFacetProcessor(FacetProcessorBase):
     EXTENSIONS = ['jpg', 'jpeg', 'png']
 
-    EXIF_TITLE_TAG = 270
+    @cleanup
+    def add_file(self, facets, relpath):
+        image_metadata = self._get_metadata(relpath)
+        gallery = self._get_gallery(facets)
+        gallery.append(image_metadata)
 
-    def get_image_metadata(self, relpath):
+    @cleanup
+    def update_file(self, facets, relpath):
+        image_metadata = self._get_metadata(relpath)
+        gallery = self._get_gallery(facets)
+        for entry in gallery:
+            if entry['file'] == relpath:
+                entry.update(image_metadata)
+                return
+
+    @cleanup
+    def remove_file(self, facets, relpath):
+        gallery = self._get_gallery(facets)
+        gallery = [entry for entry in gallery if entry['file'] != relpath]
+
+    def _get_gallery(self, facets):
+        if 'image' not in facets:
+            facets['image'] = {'gallery':list()}
+        elif 'gallery' not in facets['image']:
+            facets['image']['gallery'] = list()
+        return facets['image']['gallery']
+
+    def _get_metadata(self, relpath):
         path = os.path.join(self.basepath, relpath)
-        title = None
-        try:
-            with self.fsal.open(path, 'rb') as f:
-                width, height = Image.open(f).size
-            with self.fsal.open(path, 'rb') as f:
-                title_exif = self._get_image_metadata_exif(f)
-        except OpenError:
-            # File no longer exists on the storage(s). Do nothing
-            pass
-
-        title = title_exif or ''
+        meta = ImageMetadata(self.fsal, path)
         return {
             'file': relpath,
-            'title': title,
-            'width': width,
-            'height': height
+            'title': meta.get('title', ''),
+            'width': meta.get('width', 0),
+            'height': meta.get('height', 0)
         }
-
-    def add_file(self, facets, relpath):
-        image_f = facets.get('image', dict())
-        gallery = image_f.get('gallery', list())
-        for meta in gallery:
-            if meta['file'] == relpath:
-                self.update_file(facets, relpath)
-                return
-        else:
-            image_metadata = self.get_image_metadata(relpath)
-            gallery.append(image_metadata)
-            facets['image'] = { 'gallery': gallery }
-
-    def remove_file(self, facets, relpath):
-        image_f = facets.get('image', dict())
-        gallery = image_f.get('gallery', list())
-        gallery[:] = [entry for entry in gallery if entry['file'] != relpath]
-        facets['image'] = { 'gallery': gallery }
-
-    def _get_image_metadata_exif(self, fileobj):
-        title = ''
-        try:
-            image = Image.open(fileobj)
-            if image.format in ['JPG', 'TIFF']:
-                exif_data = image._getexif()
-                if exif_data:
-                    title = exif_data.get(self.EXIF_TITLE_TAG, '')
-        except IOError:
-            # File no longer exists do nothing
-            pass
-        return title
-
-    def _get_image_metadata_iptc(self, fileobj):
-        title = ''
-        try:
-            image = IPTCInfo(fileobj)
-            data = image.data
-            title = data.get('object name', '') or data.get('headline', '')
-        except Exception:
-            # IPTC data not found
-            pass
-        finally:
-            return title
 
 
 class AudioFacetProcessor(FacetProcessorBase):
     EXTENSIONS = ['mp3']
 
-    def get_audio_metadata(self, relpath):
-        artist = ''
-        title = ''
-        duration = 0
-        ext = get_extension(relpath)
-        if ext == 'mp3':
-            artist, title, duration = self._get_mp3_metadata(relpath)
+
+    @cleanup
+    def add_file(self, facets, relpath):
+        audio_metadata = self._get_metadata(relpath)
+        playlist = self._get_playlist(facets)
+        playlist.append(audio_metadata)
+
+    @cleanup
+    def update_file(self, facets, relpath):
+        audio_metadata = self._get_metadata(relpath)
+        playlist = self._get_playlist(facets)
+        for entry in playlist:
+            if entry['file'] == relpath:
+                entry.update(audio_metadata)
+                return
+
+    @cleanup
+    def remove_file(self, facets, relpath):
+        playlist = self._get_playlist(facets)
+        playlist = [entry for entry in playlist if entry['file'] != relpath]
+
+    def _get_playlist(self, facets):
+        if 'audio' not in facets:
+            facets['audio'] = {'playlist':list()}
+        elif 'playlist' not in facets['audio']:
+            facets['audio']['playlist'] = list()
+        return facets['audio']['playlist']
+
+    def _get_metadata(self, relpath):
+        path = os.path.join(self.basepath, relpath)
+        meta = AudioMetadata(self.fsal, path)
         return {
             'file': relpath,
-            'artist': artist,
-            'title': title,
-            'duration': duration
+            'artist': meta.get('artist', ''),
+            'title': meta.get('title', ''),
+            'duration': meta.get('duration', 0)
         }
-
-    def add_file(self, facets, relpath):
-        audio_facet = facets.get('audio', dict())
-        playlist = audio_facet.get('playlist', list())
-        for f in playlist:
-            if f['file'] == relpath:
-                self.update_file(facets, relpath)
-                return
-        else:
-            audio_metadata = self.get_audio_metadata(relpath)
-            playlist.append(audio_metadata)
-            facets['audio'] = { 'playlist': playlist }
-
-    def remove_file(self, facets, relpath):
-        audio_facet = facets.get('audio', dict())
-        playlist = audio_facet.get('playlist', list())
-        playlist[:] = [entry for entry in playlist if entry['file'] != relpath]
-        facets['audio'] = { 'playlist': playlist }
-
-    def _get_mp3_metadata(self, relpath):
-        artist, title, duration = ('', '', 0)
-        success, fso = self.fsal.get_fso(relpath)
-        if success:
-            mp3 = mutagen.mp3.MP3(fso.path)
-            duration = mp3.info.length
-            #TODO Use fallback tags
-            id3_tope = mp3.tags.get('TOPE')
-            id3_tit2 = mp3.tags.get('TIT2')
-            artist = id3_tope[0] if id3_tope else ''
-            title = id3_tit2[0] if id3_tit2 else ''
-        return (artist, title, duration)
 
 
 class VideoFacetProcessor(FacetProcessorBase):
     EXTENSIONS = ['mp4', 'wmv', 'webm', 'flv', 'ogv']
 
-    def get_video_metadata(self, relpath):
-        title = ''
-        duration = 0
-        width, height = (0, 0)
-        #TODO: Thumbnail extraction
-        thumbnail = ''
+    @cleanup
+    def add_file(self, facets, relpath):
+        video_metadata = self._get_metadata(relpath)
+        clips = self._get_clips(facets)
+        clips.append(video_metadata)
+
+    @cleanup
+    def update_file(self, facets, relpath):
+        video_metadata = self._get_metadata(relpath)
+        clips = self._get_clips(facets)
+        for entry in clips:
+            if entry['file'] == relpath:
+                entry.update(video_metadata)
+                return
+
+    @cleanup
+    def remove_file(self, facets, relpath):
+        clips = self._get_clips(facets)
+        clips = [entry for entry in clips if entry['file'] != relpath]
+
+    def _get_clips(self, facets):
+        if 'video' not in facets:
+            facets['video'] = {'clips':list()}
+        elif 'clips' not in facets['video']:
+            facets['video']['clips'] = list()
+        return facets['video']['clips']
+
+    def _get_metadata(self, relpath):
         path = os.path.join(self.basepath, relpath)
-        title, duration, width, height = self._get_metadata(path)
+        meta = ImageMetadata(self.fsal, path)
         return {
             'file': relpath,
-            'title': title,
-            'duration': duration,
-            'width': width,
-            'height': height,
-            'thumbnail': thumbnail,
+            'title': meta.get('title', ''),
+            'width': meta.get('width', 0),
+            'height': meta.get('height', 0),
+            'duration': meta.get('duration', 0),
+            #TODO: Thumbnail generation
+            'thumbnail': '',
         }
-
-    def add_file(self, facets, relpath):
-        video_facet = facets.get('video', dict())
-        clips = video_facet.get('clips', list())
-        for f in clips:
-            if f['file'] == relpath:
-                self.update_file(facets, relpath)
-                return
-        else:
-            video_metadata = self.get_video_metadata(relpath)
-            clips.append(video_metadata)
-            facets['video'] = { 'clips': clips }
-
-    def remove_file(self, facets, relpath):
-        video_facet = facets.get('video', dict())
-        clips = video_facet.get('clips', list())
-        clips[:] = [entry for entry in clips if entry['file'] != relpath]
-        facets['video'] = { 'clips': clips }
-
-    def _get_metadata(self, path):
-        title, duration, width, height = ('', 0, 0, 0)
-        success, fso = self.fsal.get_fso(path)
-        if success:
-            parser = createParser(to_unicode(fso.path))
-            metadata = extractMetadata(parser)
-            title = metadata.get('title', '')
-            duration = metadata.get('duration', 0)
-            if duration:
-                duration = int(duration.total_seconds())
-            width = metadata.get('width', 0)
-            height = metadata.get('height', 0)
-
-        return (title, duration, width, height)
