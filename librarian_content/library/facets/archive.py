@@ -10,10 +10,11 @@ file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 
 import os
 import copy
+import logging
 import functools
 
 from .facets import Facets, FACET_TYPES
-from .processors import get_facet_processors
+from .processors import get_facet_processors, log_facets
 
 
 class AttrDict(dict):
@@ -153,6 +154,26 @@ class FacetsArchive(object):
         with self.db.transaction():
             self._write('facets', old_facets, new_facets, shared_data={'path': new_facets['path']})
         return True
+
+    def clear_and_reload(self):
+        with self.db.transaction():
+            self.clear()
+            self.reload()
+
+    def clear(self):
+        for table in self.schema.keys():
+            q = self.db.Delete(table)
+            self.db.execute(q)
+
+    def reload(self, path=None):
+        path = path or '.'
+        (success, dirs, files) = self.fsal.list_dir(path)
+        if success:
+            for f in files:
+                logging.debug("Adding file to facets: '{}'".format(f.rel_path))
+                self.add_to_facets(f.rel_path)
+            for d in dirs:
+                self.reload(d.rel_path)
 
     def _fetch(self, table, relpath, dest, many=False):
         q = self.db.Select(sets=table, where='path = %s')
