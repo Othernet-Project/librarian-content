@@ -67,7 +67,7 @@ class ImageMetadata(HachoirMetadataWrapper):
         pass
 
     @property
-    @meta_tags(tags=('width'), default=0)
+    @meta_tags(tags=('width',), default=0)
     def width(self):
         pass
 
@@ -103,7 +103,7 @@ class VideoMetadata(HachoirMetadataWrapper):
         pass
 
     @property
-    @meta_tags(tags=('width'), default=0)
+    @meta_tags(tags=('width',), default=0)
     def width(self):
         pass
 

@@ -66,6 +66,12 @@ class Facets(CDFObject):
         else:
             raise RuntimeError("Cannot update with type {}".format(type(other)))
 
+    def has_type(self, facet_type):
+        if facet_type in FACET_TYPES:
+            mask = FACET_TYPES[facet_type]
+            return (self._data['facet_types'] & mask == mask)
+        return False
+
     @property
     def facet_types(self):
         return [name for (name, fid) in FACET_TYPES.items()
