@@ -245,6 +245,6 @@ class FacetsArchive(object):
                 q.where &= '{0} = %({0})s'.format(key)
             self.db.execute(q, primitives)
 
-        def _remove_facets(self, facets):
-            with self.db.transaction():
-                self._remove('facets', facets)
+    def _remove_facets(self, facets):
+        with self.db.transaction():
+            self._remove('facets', facets)
