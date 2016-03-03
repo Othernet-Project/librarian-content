@@ -191,14 +191,17 @@ class ImageFacetProcessor(FacetProcessorBase):
         return facets['image']['gallery']
 
     def _get_metadata(self, relpath):
-        path = os.path.join(self.basepath, relpath)
-        meta = ImageMetadata(self.fsal, path)
-        return {
-            'file': relpath,
-            'title': meta.title,
-            'width': meta.width,
-            'height': meta.height
-        }
+        try:
+            path = os.path.join(self.basepath, relpath)
+            meta = ImageMetadata(self.fsal, path)
+            return {
+                'file': relpath,
+                'title': meta.title,
+                'width': meta.width,
+                'height': meta.height
+            }
+        except IOError:
+            return dict()
 
 
 class AudioFacetProcessor(FacetProcessorBase):
@@ -316,14 +319,17 @@ class VideoFacetProcessor(FacetProcessorBase):
         return facets['video']['clips']
 
     def _get_metadata(self, relpath):
-        path = os.path.join(self.basepath, relpath)
-        meta = VideoMetadata(self.fsal, path)
-        return {
-            'file': relpath,
-            'title': meta.title,
-            'width': meta.width,
-            'height': meta.height,
-            'duration': meta.duration,
-            #TODO: Thumbnail generation
-            'thumbnail': '',
-        }
+        try:
+            path = os.path.join(self.basepath, relpath)
+            meta = VideoMetadata(self.fsal, path)
+            return {
+                'file': relpath,
+                'title': meta.title,
+                'width': meta.width,
+                'height': meta.height,
+                'duration': meta.duration,
+                #TODO: Thumbnail generation
+                'thumbnail': '',
+            }
+        except IOError:
+            return dict()
