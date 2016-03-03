@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import logging
 import datetime
 import functools
@@ -31,7 +33,7 @@ class BaseMetadata(object):
 
     def __init__(self, fsal, path):
         self.fsal = fsal
-        self.path = path
+        self.path = to_unicode(path)
 
     def get(self, key, default=None):
         raise NotImplementedError()
@@ -44,7 +46,7 @@ class HachoirMetadataWrapper(BaseMetadata):
 
         success, fso = self.fsal.get_fso(self.path)
         if not success:
-            msg = 'Error while extracting metadata. No such file: {}'.format(fso.path)
+            msg = u'Error while extracting metadata. No such file: {}'.format(self.path)
             logging.error(msg)
             raise IOError(msg)
         try:
@@ -52,7 +54,7 @@ class HachoirMetadataWrapper(BaseMetadata):
             metadata = extractMetadata(parser)
             self._meta = metadata
         except IOError as e:
-            logging.error("Error while extracting metadata from '{}': {}".format(fso.path, str(e)))
+            logging.error(u"Error while extracting metadata from '{}': {}".format(fso.path, str(e)))
             raise
 
     def get(self, key, default=None):

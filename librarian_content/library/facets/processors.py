@@ -131,7 +131,7 @@ class HtmlFacetProcessor(FacetProcessorBase):
 
     @cleanup
     def remove_file(self, facets, relpath):
-        if facets['html']['index'] == relpath:
+        if 'html' in facets and facets['html']['index'] == relpath:
             del facets['html']
             self._find_index(facets)
 
@@ -217,7 +217,7 @@ class AudioFacetProcessor(FacetProcessorBase):
         audio_metadata = self._get_metadata(relpath)
         playlist = self._get_playlist(facets)
         playlist.append(audio_metadata)
-        self._update_cover()
+        self.update_cover(facets, relpath)
 
     @cleanup
     def update_file(self, facets, relpath):
