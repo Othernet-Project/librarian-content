@@ -205,19 +205,17 @@ class ImageFacetProcessor(FacetProcessorBase):
 
 
 class AudioFacetProcessor(FacetProcessorBase):
-    EXTENSIONS = ['mp3']
+    EXTENSIONS = ['mp3', 'wav', 'ogg']
 
     ALBUMART_NAMES = ['cover', 'album', 'art']
 
 
     @cleanup
     def add_file(self, facets, relpath):
-        if is_image_file(relpath):
-            self.update_cover(facets, relpath)
         audio_metadata = self._get_metadata(relpath)
         playlist = self._get_playlist(facets)
         playlist.append(audio_metadata)
-        self.update_cover(facets, relpath)
+        self.scan_cover(facets, relpath, playlist)
 
     @cleanup
     def update_file(self, facets, relpath):
@@ -234,21 +232,30 @@ class AudioFacetProcessor(FacetProcessorBase):
             self.clear_cover(facets, relpath)
         playlist = self._get_playlist(facets)
         playlist = [entry for entry in playlist if entry['file'] != relpath]
+        self.scan_cover(facets, relpath, playlist)
 
-    def update_cover(self, facets, relpath):
-        def index(relpath):
-            name = os.path.basename(relpath or '').lower()
+    def scan_cover(self, facets, relpath, playlist):
+        def index(name):
+            name = name.lower()
             for i, n in enumerate(self.ALBUMART_NAMES):
                 if n in name:
                     return i
             return len(self.ALBUMART_NAMES)
 
-        audio_facet = self._get_audio_facet(facets)
-        cover = audio_facet.get('cover', None)
-        old_index = index(cover)
-        new_index = index(relpath)
-        if new_index < old_index:
-            audio_facet['cover'] = relpath
+        if len(playlist) == 0:
+           self.clear_cover(facets)
+           return
+        success, dirs, files = self.fsal.list_dir(self.basepath)
+        if not success:
+            return
+        best = len(self.ALBUMART_NAMES)
+        for f in files:
+            idx = index(f.name)
+            if idx < best:
+                best = idx
+        if best < len(self.ALBUMART_NAMES):
+            audio_facet = self._get_audio_facet(facets)
+            audio_facet['cover'] = files[best].name
 
     def clear_cover(self, facets, relpath):
         audio_facet = self._get_audio_facet(facets)
@@ -279,13 +286,6 @@ class AudioFacetProcessor(FacetProcessorBase):
             }
         except IOError:
             return dict()
-
-    @classmethod
-    def can_process(cls, basepath, relpath):
-        is_audio = super(AudioFacetProcessor, cls).can_process(basepath,
-                                                               relpath)
-        return is_audio or is_image_file(relpath)
-
 
 
 class VideoFacetProcessor(FacetProcessorBase):
