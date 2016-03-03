@@ -3,6 +3,10 @@ import functools
 
 from .metadata import ImageMetadata, AudioMetadata, VideoMetadata
 
+
+IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png']
+
+
 def split_name(fname):
     name, ext = os.path.splitext(fname)
     ext = ext[1:].lower()
@@ -17,6 +21,11 @@ def get_extension(fname):
 def strip_extension(fname):
     name, _ = split_name(fname)
     return name
+
+
+def is_image_file(fname):
+    ext = get_extension(fname)
+    return ext in IMAGE_EXTENSIONS
 
 
 def get_facet_processors(fsal, dir_path, file_path):
@@ -152,7 +161,7 @@ class HtmlFacetProcessor(FacetProcessorBase):
 
 
 class ImageFacetProcessor(FacetProcessorBase):
-    EXTENSIONS = ['jpg', 'jpeg', 'png']
+    EXTENSIONS = IMAGE_EXTENSIONS
 
     @cleanup
     def add_file(self, facets, relpath):
@@ -195,12 +204,17 @@ class ImageFacetProcessor(FacetProcessorBase):
 class AudioFacetProcessor(FacetProcessorBase):
     EXTENSIONS = ['mp3']
 
+    ALBUMART_NAMES = ['cover', 'album', 'art']
+
 
     @cleanup
     def add_file(self, facets, relpath):
+        if is_image_file(relpath):
+            self.update_cover(facets, relpath)
         audio_metadata = self._get_metadata(relpath)
         playlist = self._get_playlist(facets)
         playlist.append(audio_metadata)
+        self._update_cover()
 
     @cleanup
     def update_file(self, facets, relpath):
@@ -213,25 +227,62 @@ class AudioFacetProcessor(FacetProcessorBase):
 
     @cleanup
     def remove_file(self, facets, relpath):
+        if is_image_file(relpath):
+            self.clear_cover(facets, relpath)
         playlist = self._get_playlist(facets)
         playlist = [entry for entry in playlist if entry['file'] != relpath]
 
-    def _get_playlist(self, facets):
+    def update_cover(self, facets, relpath):
+        def index(relpath):
+            name = os.path.basename(relpath or '').lower()
+            for i, n in enumerate(self.ALBUMART_NAMES):
+                if n in name:
+                    return i
+            return len(self.ALBUMART_NAMES)
+
+        audio_facet = self._get_audio_facet(facets)
+        cover = audio_facet.get('cover', None)
+        old_index = index(cover)
+        new_index = index(relpath)
+        if new_index < old_index:
+            audio_facet['cover'] = relpath
+
+    def clear_cover(self, facets, relpath):
+        audio_facet = self._get_audio_facet(facets)
+        cover = audio_facet.get('cover', None)
+        if cover == relpath:
+            del audio_facet['facet']
+
+    def _get_audio_facet(self, facets):
         if 'audio' not in facets:
-            facets['audio'] = {'playlist':list()}
-        elif 'playlist' not in facets['audio']:
-            facets['audio']['playlist'] = list()
-        return facets['audio']['playlist']
+            facets['audio'] = dict()
+        return facets['audio']
+
+    def _get_playlist(self, facets):
+        audio_facet = self._get_audio_facet(facets)
+        if 'playlist' not in audio_facet:
+            audio_facet['playlist'] = list()
+        return audio_facet['playlist']
 
     def _get_metadata(self, relpath):
-        path = os.path.join(self.basepath, relpath)
-        meta = AudioMetadata(self.fsal, path)
-        return {
-            'file': relpath,
-            'artist': meta.artist,
-            'title': meta.title,
-            'duration': meta.duration
-        }
+        try:
+            path = os.path.join(self.basepath, relpath)
+            meta = AudioMetadata(self.fsal, path)
+            return {
+                'file': relpath,
+                'artist': meta.artist,
+                'title': meta.title,
+                'duration': meta.duration
+            }
+        except IOError:
+            return dict()
+
+    @classmethod
+    def can_process(cls, basepath, relpath):
+        is_audio = super(AudioFacetProcessor, cls).can_process(basepath,
+                                                               relpath)
+        return is_audio or is_image_file(relpath)
+
 
 
 class VideoFacetProcessor(FacetProcessorBase):
