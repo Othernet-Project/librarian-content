@@ -207,7 +207,7 @@ class ImageFacetProcessor(FacetProcessorBase):
 class AudioFacetProcessor(FacetProcessorBase):
     EXTENSIONS = ['mp3', 'wav', 'ogg']
 
-    ALBUMART_NAMES = ['cover', 'album', 'art']
+    ALBUMART_NAMES = ['art', 'album', 'cover']
 
 
     @cleanup
@@ -250,13 +250,15 @@ class AudioFacetProcessor(FacetProcessorBase):
             return
         files = filter(lambda f: is_image_file(f.name), files)
         best = len(self.ALBUMART_NAMES)
+        cover = ''
         for f in files:
             idx = index(f.name)
             if idx < best:
                 best = idx
-        if best < len(self.ALBUMART_NAMES):
+                cover = f.name
+        if cover:
             audio_facet = self._get_audio_facet(facets)
-            audio_facet['cover'] = files[best].name
+            audio_facet['cover'] = cover
 
     def clear_cover(self, facets):
         if 'audio' in facets:
