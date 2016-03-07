@@ -215,7 +215,7 @@ class AudioFacetProcessor(FacetProcessorBase):
         audio_metadata = self._get_metadata(relpath)
         playlist = self._get_playlist(facets)
         playlist.append(audio_metadata)
-        self.scan_cover(facets, relpath, playlist)
+        self.scan_cover(facets, playlist)
 
     @cleanup
     def update_file(self, facets, relpath):
@@ -232,9 +232,9 @@ class AudioFacetProcessor(FacetProcessorBase):
             self.clear_cover(facets, relpath)
         playlist = self._get_playlist(facets)
         playlist = [entry for entry in playlist if entry['file'] != relpath]
-        self.scan_cover(facets, relpath, playlist)
+        self.scan_cover(facets, playlist)
 
-    def scan_cover(self, facets, relpath, playlist):
+    def scan_cover(self, facets, playlist):
         def index(name):
             name = name.lower()
             for i, n in enumerate(self.ALBUMART_NAMES):
@@ -248,6 +248,7 @@ class AudioFacetProcessor(FacetProcessorBase):
         success, dirs, files = self.fsal.list_dir(self.basepath)
         if not success:
             return
+        files = filter(lambda f: is_image_file(f.name), files)
         best = len(self.ALBUMART_NAMES)
         for f in files:
             idx = index(f.name)
@@ -257,11 +258,11 @@ class AudioFacetProcessor(FacetProcessorBase):
             audio_facet = self._get_audio_facet(facets)
             audio_facet['cover'] = files[best].name
 
-    def clear_cover(self, facets, relpath):
-        audio_facet = self._get_audio_facet(facets)
-        cover = audio_facet.get('cover', None)
-        if cover == relpath:
-            del audio_facet['facet']
+    def clear_cover(self, facets):
+        if 'audio' in facets:
+            audio_facet = facets['audio']
+            if 'cover' in audio_facet:
+                del audio_facet['facet']
 
     def _get_audio_facet(self, facets):
         if 'audio' not in facets:
