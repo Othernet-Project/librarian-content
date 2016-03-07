@@ -105,6 +105,15 @@ class VideoMetadata(HachoirMetadataWrapper):
         pass
 
     @property
+    @meta_tags(tags=('author',), default='')
+    def author(self):
+        pass
+    @property
+    @meta_tags(tags=('description',), default='')
+    def description(self):
+        pass
+
+    @property
     @meta_tags(tags=('width',), default=0)
     def width(self):
         pass

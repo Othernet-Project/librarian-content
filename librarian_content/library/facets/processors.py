@@ -325,6 +325,8 @@ class VideoFacetProcessor(FacetProcessorBase):
             return {
                 'file': relpath,
                 'title': meta.title,
+                'author': meta.author,
+                'description': meta.description,
                 'width': meta.width,
                 'height': meta.height,
                 'duration': meta.duration,
