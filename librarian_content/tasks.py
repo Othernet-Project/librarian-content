@@ -81,5 +81,6 @@ def check_new_content(supervisor):
 
     if changes_found:
         supervisor.exts.cache.invalidate('content')
+        supervisor.exts.cache.invalidate('facets')
 
     return changes_found
