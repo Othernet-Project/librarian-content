@@ -4,35 +4,12 @@ import json
 import gevent
 import logging
 import datetime
-import functools
-import itertools
 import subprocess
 
 from bottle_utils.common import to_unicode
-from hachoir_parser import createParser
-from hachoir_metadata import extractMetadata
 
 
 FFPROBE_CMD = 'ffprobe -v quiet -i HOLDER1 -show_entries HOLDER2 -print_format json'
-
-
-def meta_tags(tags, default=None, transform=None):
-    def decorator(func):
-        @functools.wraps(func)
-        def wrapper(self):
-            items = (self._meta.getItem(tag, 0) for tag in tags)
-            values = (item.value for item in items if item)
-            transformed = itertools.imap(transform, values)
-            value = next(transformed, default)
-            return value
-        return wrapper
-    return decorator
-
-
-def to_seconds(duration):
-    if isinstance(duration, datetime.timedelta):
-        duration = int(duration.total_seconds())
-    return duration
 
 
 def run_command(command, timeout, debug=False):
@@ -64,7 +41,6 @@ def build_ffprobe_command(path, entries=('format', 'streams')):
     command = FFPROBE_CMD.split(' ')
     command[4] = path
     command[6] = show_entries
-    print(command)
     return command
 
 
@@ -76,31 +52,6 @@ class BaseMetadata(object):
 
     def get(self, key, default=None):
         raise NotImplementedError()
-
-
-class HachoirMetadataWrapper(BaseMetadata):
-
-    def __init__(self, *args, **kwargs):
-        super(HachoirMetadataWrapper, self).__init__(*args, **kwargs)
-
-        success, fso = self.fsal.get_fso(self.path)
-        if not success:
-            msg = u'Error while extracting metadata. No such file: {}'.format(
-                self.path)
-            logging.error(msg)
-            raise IOError(msg)
-        try:
-            parser = createParser(to_unicode(fso.path))
-            metadata = extractMetadata(parser)
-            self._meta = metadata
-        except IOError as e:
-            logging.error(
-                u"Error while extracting metadata from '{}': {}".format(
-                    fso.path, str(e)))
-            raise
-
-    def get(self, key, default=None):
-        return self._meta.get(key, default)
 
 
 class FFmpegMetadataWrapper(BaseMetadata):
@@ -118,7 +69,7 @@ class FFmpegMetadataWrapper(BaseMetadata):
             logging.error(msg)
             raise IOError(msg)
         command = build_ffprobe_command(fso.path, entries=entries)
-        output = run_command(command, timeout=5, debug=True)
+        output = run_command(command, timeout=5)
         if not output:
             msg = u'Error extracting metadata: Extraction timedout or failed'
             raise IOError(msg)
