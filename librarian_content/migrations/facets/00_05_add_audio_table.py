@@ -9,7 +9,7 @@ create table playlist
 (
     path varchar,
     file varchar,
-    artist varchar,
+    author varchar,
     title varchar,
     duration integer,
     unique(path, file)

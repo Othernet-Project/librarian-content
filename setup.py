@@ -22,9 +22,6 @@ setup(
         'outernet_metadata',
         'librarian_core',
         'fsal',
-        'hachoir-core',
-        'hachoir-parser',
-        'hachoir-metadata',
     ],
     dependency_links=[
         'git+ssh://git@github.com/Outernet-Project/librarian-core.git#egg=librarian_core-0.1',
