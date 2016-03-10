@@ -283,7 +283,7 @@ class AudioFacetProcessor(FacetProcessorBase):
             meta = AudioMetadata(self.fsal, path)
             return {
                 'file': relpath,
-                'artist': meta.artist,
+                'artist': meta.author,
                 'title': meta.title,
                 'duration': meta.duration
             }

@@ -159,63 +159,14 @@ class ImageMetadata(HachoirMetadataWrapper):
         pass
 
 
-class AudioMetadata(HachoirMetadataWrapper):
-
-    @property
-    @meta_tags(tags=('artist', 'author'), default='')
-    def artist(self):
-        pass
-
-    @property
-    @meta_tags(tags=('title',), default='')
-    def title(self):
-        pass
-
-    @property
-    @meta_tags(tags=('duration',), default=0, transform=to_seconds)
-    def duration(self):
-        pass
-
-
-class HachoirVideoMetadata(HachoirMetadataWrapper):
-
-    @property
-    @meta_tags(tags=('title',), default='')
-    def title(self):
-        pass
-
-    @property
-    @meta_tags(tags=('author',), default='')
-    def author(self):
-        pass
-    @property
-    @meta_tags(tags=('description',), default='')
-    def description(self):
-        pass
-
-    @property
-    @meta_tags(tags=('width',), default=0)
-    def width(self):
-        pass
-
-    @property
-    @meta_tags(tags=('height',), default=0)
-    def height(self):
-        pass
-
-    @property
-    @meta_tags(tags=('duration',), default=0, transform=to_seconds)
-    def duration(self):
-        pass
-
-
-class FFmpegVideoMetadata(FFmpegMetadataWrapper):
+class FFmpegAudioVideoMetadata(FFmpegMetadataWrapper):
     def __init__(self, *args, **kwargs):
-        super(FFmpegVideoMetadata, self).__init__(*args, **kwargs)
+        super(FFmpegAudioVideoMetadata, self).__init__(*args, **kwargs)
         self.width, self.height = self.get_dimensions()
         self.duration = self.get_duration()
         self.title = self.get_fmt_tags(('title',))
         self.author = self.get_fmt_tags(('author', 'artist'))
         self.description = self.get_fmt_tags(('description', 'comment'))
 
-VideoMetadata = FFmpegVideoMetadata
+AudioMetadata = FFmpegAudioVideoMetadata
+VideoMetadata = FFmpegAudioVideoMetadata
