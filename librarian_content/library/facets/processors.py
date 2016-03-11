@@ -29,7 +29,7 @@ def is_image_file(fname):
 
 
 def get_facet_processors(fsal, dir_path, file_path):
-    all_processors =  FacetProcessorBase.__subclasses__()
+    all_processors = FacetProcessorBase.__subclasses__()
     valid_processors = []
     for processor in all_processors:
         if processor.can_process(dir_path, file_path):
@@ -37,7 +37,7 @@ def get_facet_processors(fsal, dir_path, file_path):
     return valid_processors
 
 
-#TODO: Remove this after facets become stable
+# TODO: Remove this after facets become stable
 def log_facets(prefix, facets):
     import pprint
     import logging
@@ -46,8 +46,8 @@ def log_facets(prefix, facets):
 
 def cleanup(func):
     @functools.wraps(func)
-    def wrapper(self, facets, path):
-        result = func(self, facets, path)
+    def wrapper(self, facets, path, *args, **kwargs):
+        result = func(self, facets, path, *args, **kwargs)
         _cleanup(facets)
         return result
     return wrapper
@@ -77,13 +77,13 @@ class FacetProcessorBase(object):
         self.fsal = fsal
         self.basepath = basepath
 
-    def add_file(self, facets, relpath):
+    def add_file(self, facets, relpath, partial=False):
         raise NotImplementedError()
 
     def remove_file(self, facets, relpath):
         raise NotImplementedError()
 
-    def update_file(self, facets, relpath):
+    def update_file(self, facets, relpath, partial=False):
         raise NotImplementedError()
 
     @classmethod
@@ -109,17 +109,24 @@ class FacetProcessorBase(object):
             result.extend(cls.subclasses(source=child))
         return result
 
+    @staticmethod
+    def contains(entries, path):
+        for entry in entries:
+            if entry['file'] == path:
+                return True
+        return False
+
 
 class GenericFacetProcessor(FacetProcessorBase):
     name = 'generic'
 
-    def add_file(self, facets, relpath):
+    def add_file(self, facets, relpath, partial=False):
         return self._process(facets, relpath)
 
     def remove_file(self, facets, relpath):
         return self._process(facets, relpath)
 
-    def update_file(self, facets, relpath):
+    def update_file(self, facets, relpath, partial=False):
         return self._process(facets, relpath)
 
     def _process(self, facets, relpath):
@@ -142,7 +149,7 @@ class HtmlFacetProcessor(FacetProcessorBase):
     }
 
     @cleanup
-    def add_file(self, facets, relpath):
+    def add_file(self, facets, relpath, partial=False):
         if 'html' in facets:
             index_name = os.path.basename(facets['html']['index'])
             if 'index' in index_name:
@@ -150,7 +157,7 @@ class HtmlFacetProcessor(FacetProcessorBase):
                 return
         self._find_index(facets)
 
-    def update_file(self, facets, relpath):
+    def update_file(self, facets, relpath, partial=False):
         pass
 
     @cleanup
@@ -165,7 +172,8 @@ class HtmlFacetProcessor(FacetProcessorBase):
         path_priority = 100
         html_count = 0
         first_html_file = None
-        files = filter(lambda f: get_extension(f.name) in self.EXTENSIONS, files)
+        files = filter(
+            lambda f: get_extension(f.name) in self.EXTENSIONS, files)
         for f in files:
             name, ext = split_name(f.name)
             if name in self.INDEX_NAMES.keys():
@@ -181,7 +189,7 @@ class HtmlFacetProcessor(FacetProcessorBase):
 
         if index_path:
             index_path = os.path.relpath(index_path, self.basepath)
-            facets['html'] = { 'index': index_path }
+            facets['html'] = {'index': index_path}
 
 
 class ImageFacetProcessor(FacetProcessorBase):
@@ -190,14 +198,17 @@ class ImageFacetProcessor(FacetProcessorBase):
     EXTENSIONS = IMAGE_EXTENSIONS
 
     @cleanup
-    def add_file(self, facets, relpath):
-        image_metadata = self._get_metadata(relpath)
+    def add_file(self, facets, relpath, partial=False):
         gallery = self._get_gallery(facets)
-        gallery.append(image_metadata)
+        if self.contains(gallery, relpath):
+            self.update_file(facets, relpath, partial)
+        else:
+            image_metadata = self._get_metadata(relpath, partial)
+            gallery.append(image_metadata)
 
     @cleanup
-    def update_file(self, facets, relpath):
-        image_metadata = self._get_metadata(relpath)
+    def update_file(self, facets, relpath, partial=False):
+        image_metadata = self._get_metadata(relpath, partial)
         gallery = self._get_gallery(facets)
         for entry in gallery:
             if entry['file'] == relpath:
@@ -211,12 +222,14 @@ class ImageFacetProcessor(FacetProcessorBase):
 
     def _get_gallery(self, facets):
         if 'image' not in facets:
-            facets['image'] = {'gallery':list()}
+            facets['image'] = {'gallery': list()}
         elif 'gallery' not in facets['image']:
             facets['image']['gallery'] = list()
         return facets['image']['gallery']
 
-    def _get_metadata(self, relpath):
+    def _get_metadata(self, relpath, partial):
+        if partial:
+            return {'file': relpath}
         try:
             path = os.path.join(self.basepath, relpath)
             meta = ImageMetadata(self.fsal, path)
@@ -237,17 +250,19 @@ class AudioFacetProcessor(FacetProcessorBase):
 
     ALBUMART_NAMES = ['art', 'album', 'cover']
 
-
     @cleanup
-    def add_file(self, facets, relpath):
-        audio_metadata = self._get_metadata(relpath)
+    def add_file(self, facets, relpath, partial=False):
         playlist = self._get_playlist(facets)
-        playlist.append(audio_metadata)
-        self.scan_cover(facets, playlist)
+        if self.contains(playlist, relpath):
+            self.update_file(facets, relpath, partial)
+        else:
+            audio_metadata = self._get_metadata(relpath, partial)
+            playlist.append(audio_metadata)
+            self.scan_cover(facets, playlist)
 
     @cleanup
-    def update_file(self, facets, relpath):
-        audio_metadata = self._get_metadata(relpath)
+    def update_file(self, facets, relpath, partial=False):
+        audio_metadata = self._get_metadata(relpath, partial)
         playlist = self._get_playlist(facets)
         for entry in playlist:
             if entry['file'] == relpath:
@@ -271,8 +286,8 @@ class AudioFacetProcessor(FacetProcessorBase):
             return len(self.ALBUMART_NAMES)
 
         if len(playlist) == 0:
-           self.clear_cover(facets)
-           return
+            self.clear_cover(facets)
+            return
         success, dirs, files = self.fsal.list_dir(self.basepath)
         if not success:
             return
@@ -305,7 +320,9 @@ class AudioFacetProcessor(FacetProcessorBase):
             audio_facet['playlist'] = list()
         return audio_facet['playlist']
 
-    def _get_metadata(self, relpath):
+    def _get_metadata(self, relpath, partial):
+        if partial:
+            return {'file': relpath}
         try:
             path = os.path.join(self.basepath, relpath)
             meta = AudioMetadata(self.fsal, path)
@@ -325,14 +342,17 @@ class VideoFacetProcessor(FacetProcessorBase):
     EXTENSIONS = ['mp4', 'wmv', 'webm', 'flv', 'ogv']
 
     @cleanup
-    def add_file(self, facets, relpath):
-        video_metadata = self._get_metadata(relpath)
+    def add_file(self, facets, relpath, partial=False):
         clips = self._get_clips(facets)
-        clips.append(video_metadata)
+        if self.contains(clips, relpath):
+            self.update_file(facets, relpath, partial)
+        else:
+            video_metadata = self._get_metadata(relpath, partial)
+            clips.append(video_metadata)
 
     @cleanup
-    def update_file(self, facets, relpath):
-        video_metadata = self._get_metadata(relpath)
+    def update_file(self, facets, relpath, partial=False):
+        video_metadata = self._get_metadata(relpath, partial)
         clips = self._get_clips(facets)
         for entry in clips:
             if entry['file'] == relpath:
@@ -346,12 +366,14 @@ class VideoFacetProcessor(FacetProcessorBase):
 
     def _get_clips(self, facets):
         if 'video' not in facets:
-            facets['video'] = {'clips':list()}
+            facets['video'] = {'clips': list()}
         elif 'clips' not in facets['video']:
             facets['video']['clips'] = list()
         return facets['video']['clips']
 
-    def _get_metadata(self, relpath):
+    def _get_metadata(self, relpath, partial):
+        if partial:
+            return {'file': relpath}
         try:
             path = os.path.join(self.basepath, relpath)
             meta = VideoMetadata(self.fsal, path)
@@ -363,7 +385,7 @@ class VideoFacetProcessor(FacetProcessorBase):
                 'width': meta.width,
                 'height': meta.height,
                 'duration': meta.duration,
-                #TODO: Thumbnail generation
+                # TODO: Thumbnail generation
                 'thumbnail': '',
             }
         except IOError:

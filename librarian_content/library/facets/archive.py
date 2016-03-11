@@ -14,7 +14,7 @@ import logging
 import functools
 
 from .facets import Facets, FACET_TYPES
-from .processors import get_facet_processors, log_facets
+from .processors import get_facet_processors
 
 
 class AttrDict(dict):
@@ -105,7 +105,7 @@ class FacetsArchive(object):
     def many(self, *args, **kwargs):
         return self.db.fetchall(*args, **kwargs)
 
-    def add_to_facets(self, path):
+    def add_or_update_to_facets(self, path):
         root = os.path.dirname(path)
         relpath = os.path.relpath(path, root)
         current_facets = self.get_or_init_facets(root)
