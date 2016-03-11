@@ -26,9 +26,9 @@ def get_facets(path, partial=True):
                             config=supervisor.config)
     facets = archive.get_facets(path)
     if not facets:
-        logging.debug("Facets not found for '{}'. Scheduling generation".format(
-            path))
-        schedule_facets_generation(path, archive)
+        logging.debug("Facets not found for '{}'."
+                      " Scheduling generation".format(path))
+        schedule_facets_generation(path, archive, config=supervisor.config)
         if partial:
             facets = generate_partial_facets(path, supervisor, fsal)
     return facets
@@ -59,7 +59,9 @@ def fill_path(data, path):
                 fill_path(row, path)
 
 
-def schedule_facets_generation(path, archive):
+def schedule_facets_generation(path, archive, config):
+    delay = config.get('facets.ondemand_delay', 0)
+    kwargs = dict(archive=archive, path=path)
     exts.tasks.schedule(update_facets_for_dir,
-                        kwargs=dict(archive=archive,
-                                    path=path))
+                        kwargs=kwargs,
+                        delay=delay)
