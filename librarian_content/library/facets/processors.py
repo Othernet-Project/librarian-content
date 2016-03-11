@@ -29,7 +29,7 @@ def is_image_file(fname):
 
 
 def get_facet_processors(fsal, dir_path, file_path):
-    all_processors =  FacetProcessorBase.__subclasses__()
+    all_processors = FacetProcessorBase.__subclasses__()
     valid_processors = []
     for processor in all_processors:
         if processor.can_process(dir_path, file_path):
@@ -37,7 +37,7 @@ def get_facet_processors(fsal, dir_path, file_path):
     return valid_processors
 
 
-#TODO: Remove this after facets become stable
+# TODO: Remove this after facets become stable
 def log_facets(prefix, facets):
     import pprint
     import logging
@@ -141,7 +141,8 @@ class HtmlFacetProcessor(FacetProcessorBase):
         path_priority = 100
         html_count = 0
         first_html_file = None
-        files = filter(lambda f: get_extension(f.name) in self.EXTENSIONS, files)
+        files = filter(
+            lambda f: get_extension(f.name) in self.EXTENSIONS, files)
         for f in files:
             name, ext = split_name(f.name)
             if name in self.INDEX_NAMES.keys():
@@ -185,7 +186,7 @@ class ImageFacetProcessor(FacetProcessorBase):
 
     def _get_gallery(self, facets):
         if 'image' not in facets:
-            facets['image'] = {'gallery':list()}
+            facets['image'] = {'gallery': list()}
         elif 'gallery' not in facets['image']:
             facets['image']['gallery'] = list()
         return facets['image']['gallery']
@@ -210,7 +211,6 @@ class AudioFacetProcessor(FacetProcessorBase):
     EXTENSIONS = ['mp3', 'wav', 'ogg']
 
     ALBUMART_NAMES = ['art', 'album', 'cover']
-
 
     @cleanup
     def add_file(self, facets, relpath, partial=False):
@@ -245,8 +245,8 @@ class AudioFacetProcessor(FacetProcessorBase):
             return len(self.ALBUMART_NAMES)
 
         if len(playlist) == 0:
-           self.clear_cover(facets)
-           return
+            self.clear_cover(facets)
+            return
         success, dirs, files = self.fsal.list_dir(self.basepath)
         if not success:
             return
@@ -320,7 +320,7 @@ class VideoFacetProcessor(FacetProcessorBase):
 
     def _get_clips(self, facets):
         if 'video' not in facets:
-            facets['video'] = {'clips':list()}
+            facets['video'] = {'clips': list()}
         elif 'clips' not in facets['video']:
             facets['video']['clips'] = list()
         return facets['video']['clips']
@@ -339,7 +339,7 @@ class VideoFacetProcessor(FacetProcessorBase):
                 'width': meta.width,
                 'height': meta.height,
                 'duration': meta.duration,
-                #TODO: Thumbnail generation
+                # TODO: Thumbnail generation
                 'thumbnail': '',
             }
         except IOError:
