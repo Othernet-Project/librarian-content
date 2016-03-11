@@ -94,6 +94,11 @@ def update_facets_for_dir(path, archive):
         logging.debug(u'Facet generation cancelled. {} does not exist'.format(
             path))
         return
+    facets = archive.get_facets(path)
+    if facets:
+        logging.debug(u'Facets already generated for {}. Ignoring.'.format(
+            path))
+        return
     for f in files:
         logging.info(u"Adding file to facets archive: '{}'".format(f.rel_path))
         archive.add_or_update_to_facets(f.rel_path)
