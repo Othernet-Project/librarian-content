@@ -4,6 +4,7 @@ import json
 import gevent
 import logging
 import datetime
+import functools
 import subprocess
 
 from bottle_utils.common import to_unicode
@@ -34,6 +35,16 @@ def run_command(command, timeout, debug=False):
             'Command with pid {} ended normally with return code {}'.format(
                 process.pid, process.returncode))
     return (process.returncode, process.stdout.read())
+
+
+def runnable(timeout=5, debug=True):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            cmd = func(*args, **kwargs)
+            return run_command(cmd, timeout=timeout, debug=debug)
+        return wrapper
+    return decorator
 
 
 def build_ffprobe_command(path, entries=('format', 'streams')):
