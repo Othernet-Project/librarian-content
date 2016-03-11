@@ -44,6 +44,13 @@ def build_ffprobe_command(path, entries=('format', 'streams')):
     return command
 
 
+def find_in_dicts(dicts, tags):
+    for d in dicts:
+        for tag in tags:
+            if tag in d:
+                return d[tag]
+
+
 class BaseMetadata(object):
 
     def __init__(self, fsal, path):
@@ -122,9 +129,10 @@ class FFmpegImageMetadata(FFmpegMetadataWrapper):
         frames = self.data.get('frames', [])
         for frame in frames:
             frame_tags = frame.get('tags', dict())
-            for tag in tags:
-                if tag in frame_tags:
-                    return frame_tags[tag]
+            search_space = (frame, frame_tags)
+            ret = find_in_dicts(search_space, tags)
+            if ret is not None:
+                return ret
         return default
 
 
