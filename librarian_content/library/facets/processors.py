@@ -68,7 +68,12 @@ def _cleanup(data):
 
 
 class FacetProcessorBase(object):
+    name = None
+
     def __init__(self, fsal, basepath):
+        if self.name is None:
+            raise TypeError("Usage of abstract processor is not allowed."
+                            "`name` attribute must be defined.")
         self.fsal = fsal
         self.basepath = basepath
 
@@ -88,8 +93,25 @@ class FacetProcessorBase(object):
             return get_extension(relpath) in extensions
         return False
 
+    @classmethod
+    def get_processor(cls, path):
+        ext = get_extension(path)
+        for processor_cls in cls.subclasses():
+            if ext in getattr(processor_cls, 'EXTENSIONS', []):
+                return processor_cls
+        raise RuntimeError("No processor found for the given type.")
+
+    @classmethod
+    def subclasses(cls, source=None):
+        source = source or cls
+        result = source.__subclasses__()
+        for child in result:
+            result.extend(cls.subclasses(source=child))
+        return result
+
 
 class GenericFacetProcessor(FacetProcessorBase):
+    name = 'generic'
 
     def add_file(self, facets, relpath):
         return self._process(facets, relpath)
@@ -109,6 +131,8 @@ class GenericFacetProcessor(FacetProcessorBase):
 
 
 class HtmlFacetProcessor(FacetProcessorBase):
+    name = 'html'
+
     EXTENSIONS = ['html', 'htm']
 
     INDEX_NAMES = {
@@ -161,6 +185,8 @@ class HtmlFacetProcessor(FacetProcessorBase):
 
 
 class ImageFacetProcessor(FacetProcessorBase):
+    name = 'image'
+
     EXTENSIONS = IMAGE_EXTENSIONS
 
     @cleanup
@@ -205,6 +231,8 @@ class ImageFacetProcessor(FacetProcessorBase):
 
 
 class AudioFacetProcessor(FacetProcessorBase):
+    name = 'audio'
+
     EXTENSIONS = ['mp3', 'wav', 'ogg']
 
     ALBUMART_NAMES = ['art', 'album', 'cover']
@@ -292,6 +320,8 @@ class AudioFacetProcessor(FacetProcessorBase):
 
 
 class VideoFacetProcessor(FacetProcessorBase):
+    name = 'video'
+
     EXTENSIONS = ['mp4', 'wmv', 'webm', 'flv', 'ogv']
 
     @cleanup
