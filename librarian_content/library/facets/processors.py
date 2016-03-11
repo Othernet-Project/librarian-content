@@ -204,7 +204,7 @@ class HtmlFacetProcessor(FacetProcessorBase):
             self._find_index(facets)
 
     def _find_index(self, facets):
-        (success, dirs, files) = self.fsal.list_dir(facets['path'])
+        (success, dirs, files) = self.fsal.list_dir(self.basepath)
         index_path = None
         path_priority = 100
         html_count = 0
