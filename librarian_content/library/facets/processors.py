@@ -1,7 +1,7 @@
 import os
 import functools
 
-from .metadata import ImageMetadata, AudioMetadata, VideoMetadata
+from .metadata import runnable, ImageMetadata, AudioMetadata, VideoMetadata
 
 
 IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png']
@@ -114,6 +114,43 @@ class FacetProcessorBase(object):
         result = source.__subclasses__()
         for child in result:
             result.extend(cls.subclasses(source=child))
+        return result
+
+    @staticmethod
+    def contains(entries, path):
+        for entry in entries:
+            if entry['file'] == path:
+                return True
+        return False
+
+    @staticmethod
+    def determine_thumb_path(imgpath, thumbdir, extension):
+        imgdir = os.path.dirname(imgpath)
+        filename = os.path.basename(imgpath)
+        (name, _) = os.path.splitext(filename)
+        newname = '.'.join([name, extension])
+        return os.path.join(imgdir, thumbdir, newname)
+
+    @classmethod
+    def create_thumb(cls, srcpath, thumbpath, root, size, quality,
+                     callback=None, default=None):
+        if os.path.exists(thumbpath):
+            return
+
+        thumbdir = os.path.dirname(thumbpath)
+        if not os.path.exists(thumbdir):
+            os.makedirs(thumbdir)
+
+        (width, height) = map(int, size.split('x'))
+        (ret, _) = cls.generate_thumb(srcpath,
+                                      thumbpath,
+                                      width=width,
+                                      height=height,
+                                      quality=quality)
+        result = os.path.relpath(thumbpath, root) if ret == 0 else default
+        if callback:
+            callback(srcpath, result)
+
         return result
 
 
@@ -242,6 +279,20 @@ class ImageFacetProcessor(FacetProcessorBase):
         except IOError:
             return dict()
 
+    @staticmethod
+    @runnable()
+    def generate_thumb(src, dest, width, height, quality, **kwargs):
+        return [
+            "ffmpeg",
+            "-i",
+            src,
+            "-q:v",
+            str(quality),
+            "-vf",
+            "scale='if(gt(in_w,in_h),-1,{height})':'if(gt(in_w,in_h),{width},-1)',crop={width}:{height}".format(width=width, height=height),  # NOQA
+            dest
+        ]
+
 
 class AudioFacetProcessor(FacetProcessorBase):
     name = 'audio'
@@ -335,6 +386,19 @@ class AudioFacetProcessor(FacetProcessorBase):
         except IOError:
             return dict()
 
+    @staticmethod
+    @runnable()
+    def generate_thumb(src, dest, **kwargs):
+        return [
+            "ffmpeg",
+            "-i",
+            src,
+            "-an",
+            "-vcodec",
+            "copy",
+            dest
+        ]
+
 
 class VideoFacetProcessor(FacetProcessorBase):
     name = 'video'
@@ -390,3 +454,22 @@ class VideoFacetProcessor(FacetProcessorBase):
             }
         except IOError:
             return dict()
+
+    @staticmethod
+    @runnable()
+    def generate_thumb(src, dest, skip_secs=3, **kwargs):
+        return [
+            "ffmpeg",
+            "-ss",
+            str(skip_secs),
+            "-i",
+            src,
+            "-vf",
+            "select=gt(scene\,0.5)",
+            "-frames:v",
+            "1",
+            "-vsync",
+            "vfr",
+            dest
+        ]
+
