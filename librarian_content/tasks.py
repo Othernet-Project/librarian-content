@@ -4,6 +4,8 @@ import os
 
 from fsal.events import EVENT_CREATED, EVENT_DELETED, EVENT_MODIFIED
 
+from librarian_core.exts import ext_container as exts
+
 from .library.archive import Archive
 from .library.facets.archive import FacetsArchive
 
@@ -59,9 +61,9 @@ def check_new_content(supervisor):
         if event.is_dir and event.event_type == EVENT_DELETED:
             logging.info(u"Removing path from facets archive: '{}'".format(event.src))
             facets_archive.remove_facets(event.src)
-        elif event.event_type == EVENT_CREATED:
+        elif event.event_type in (EVENT_CREATED, EVENT_MODIFIED):
             logging.info(u"Adding file to facets archive: '{}'".format(event.src))
-            facets_archive.add_to_facets(event.src)
+            facets_archive.add_or_update_to_facets(event.src)
         elif event.event_type == EVENT_DELETED:
             logging.info(u"Removing file from facets archive: '{}'".format(event.src))
             facets_archive.remove_from_facets(event.src)
@@ -81,6 +83,22 @@ def check_new_content(supervisor):
 
     if changes_found:
         supervisor.exts.cache.invalidate('content')
-        supervisor.exts.cache.invalidate('facets')
 
     return changes_found
+
+
+def update_facets_for_dir(path, archive):
+    logging.debug(u'Scheduled facet generation triggered for {}'.format(path))
+    success, dirs, files = exts.fsal.list_dir(path)
+    if not success:
+        logging.debug(u'Facet generation cancelled. {} does not exist'.format(
+            path))
+        return
+    facets = archive.get_facets(path)
+    if facets:
+        logging.debug(u'Facets already generated for {}. Ignoring.'.format(
+            path))
+        return
+    for f in files:
+        logging.info(u"Adding file to facets archive: '{}'".format(f.rel_path))
+        archive.add_or_update_to_facets(f.rel_path)
