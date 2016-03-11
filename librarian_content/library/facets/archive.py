@@ -56,6 +56,8 @@ def update_facets(facets):
 
 
 class FacetsArchive(object):
+    ROOT_PATH = '.'
+
     schema = {
         'facets': {
             'constraints': ['path']
@@ -106,7 +108,7 @@ class FacetsArchive(object):
         return self.db.fetchall(*args, **kwargs)
 
     def add_or_update_to_facets(self, path):
-        root = os.path.dirname(path)
+        root = os.path.dirname(path) or self.ROOT_PATH
         relpath = os.path.relpath(path, root)
         current_facets = self.get_or_init_facets(root)
         new_facets = copy.deepcopy(current_facets)
