@@ -381,6 +381,8 @@ class AudioFacetProcessor(FacetProcessorBase):
                 'file': relpath,
                 'author': meta.author,
                 'title': meta.title,
+                'album': meta.album,
+                'genre': meta.genre,
                 'duration': meta.duration
             }
         except IOError:

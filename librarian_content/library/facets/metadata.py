@@ -165,6 +165,15 @@ class FFmpegAudioVideoMetadata(FFmpegMetadataWrapper):
             height = stream.get('height', height)
         return width, height
 
+
+class AudioMetadata(FFmpegAudioVideoMetadata):
+
+    def __init__(self, *args, **kwargs):
+        super(AudioMetadata, self).__init__(*args, **kwargs)
+        self.genre = self.get_format_tag(('genre',))
+        self.album = self.get_format_tag(('album',))
+
+
 ImageMetadata = FFmpegImageMetadata
-AudioMetadata = FFmpegAudioVideoMetadata
+
 VideoMetadata = FFmpegAudioVideoMetadata
