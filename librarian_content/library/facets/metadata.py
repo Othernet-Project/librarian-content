@@ -33,7 +33,7 @@ def run_command(command, timeout, debug=False):
         logging.debug(
             'Command with pid {} ended normally with return code {}'.format(
                 process.pid, process.returncode))
-    return process.stdout.read()
+    return (process.returncode, process.stdout.read())
 
 
 def build_ffprobe_command(path, entries=('format', 'streams')):
@@ -69,7 +69,7 @@ class FFmpegMetadataWrapper(BaseMetadata):
             logging.error(msg)
             raise IOError(msg)
         command = build_ffprobe_command(fso.path, entries=entries)
-        output = run_command(command, timeout=5)
+        (ret, output) = run_command(command, timeout=5)
         if not output:
             msg = u'Error extracting metadata: Extraction timedout or failed'
             raise IOError(msg)
