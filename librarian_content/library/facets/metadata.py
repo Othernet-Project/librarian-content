@@ -29,7 +29,7 @@ def run_command(command, timeout, debug=False):
                     'Command ({}) ran past timeout of {} secs and'
                     ' will be terminated'.format(' '.join(command), timeout))
             process.kill()
-            return None
+            return (None, None)
     if debug:
         logging.debug(
             'Command with pid {} ended normally with return code {}'.format(
