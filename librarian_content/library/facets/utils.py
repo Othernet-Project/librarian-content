@@ -6,10 +6,11 @@ import logging
 from bottle import request
 
 from librarian_core.exts import ext_container as exts
-from ...tasks import update_facets_for_dir
+
 from .facets import Facets
-from .archive import FacetsArchive, update_facets
+from ...tasks import update_facets_for_dir
 from .processors import get_facet_processors
+from .archive import FacetsArchive, update_facets
 
 
 BASE_FACETS = {
