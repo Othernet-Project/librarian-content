@@ -46,8 +46,8 @@ def log_facets(prefix, facets):
 
 def cleanup(func):
     @functools.wraps(func)
-    def wrapper(self, facets, path, **kwargs):
-        result = func(self, facets, path, **kwargs)
+    def wrapper(self, facets, path, *args, **kwargs):
+        result = func(self, facets, path, *args, **kwargs)
         _cleanup(facets)
         return result
     return wrapper
@@ -86,6 +86,13 @@ class FacetProcessorBase(object):
         if hasattr(cls, 'EXTENSIONS'):
             extensions = list(getattr(cls, 'EXTENSIONS'))
             return get_extension(relpath) in extensions
+        return False
+
+    @staticmethod
+    def contains(entries, path):
+        for entry in entries:
+            if entry['file'] == path:
+                return True
         return False
 
 
@@ -166,9 +173,12 @@ class ImageFacetProcessor(FacetProcessorBase):
 
     @cleanup
     def add_file(self, facets, relpath, partial=False):
-        image_metadata = self._get_metadata(relpath, partial)
         gallery = self._get_gallery(facets)
-        gallery.append(image_metadata)
+        if self.contains(gallery, relpath):
+            self.update_file(facets, relpath, partial)
+        else:
+            image_metadata = self._get_metadata(relpath, partial)
+            gallery.append(image_metadata)
 
     @cleanup
     def update_file(self, facets, relpath, partial=False):
@@ -214,10 +224,13 @@ class AudioFacetProcessor(FacetProcessorBase):
 
     @cleanup
     def add_file(self, facets, relpath, partial=False):
-        audio_metadata = self._get_metadata(relpath, partial)
         playlist = self._get_playlist(facets)
-        playlist.append(audio_metadata)
-        self.scan_cover(facets, playlist)
+        if self.contains(playlist, relpath):
+            self.update_file(facets, relpath, partial)
+        else:
+            audio_metadata = self._get_metadata(relpath, partial)
+            playlist.append(audio_metadata)
+            self.scan_cover(facets, playlist)
 
     @cleanup
     def update_file(self, facets, relpath, partial=False):
@@ -300,9 +313,12 @@ class VideoFacetProcessor(FacetProcessorBase):
 
     @cleanup
     def add_file(self, facets, relpath, partial=False):
-        video_metadata = self._get_metadata(relpath, partial)
         clips = self._get_clips(facets)
-        clips.append(video_metadata)
+        if self.contains(clips, relpath):
+            self.update_file(facets, relpath, partial)
+        else:
+            video_metadata = self._get_metadata(relpath, partial)
+            clips.append(video_metadata)
 
     @cleanup
     def update_file(self, facets, relpath, partial=False):

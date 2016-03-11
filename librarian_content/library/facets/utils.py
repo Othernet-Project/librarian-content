@@ -1,8 +1,12 @@
+from __future__ import unicode_literals
+
 import copy
+import logging
 
 from bottle import request
 
 from librarian_core.exts import ext_container as exts
+from ...tasks import update_facets_for_dir
 from .facets import Facets
 from .archive import FacetsArchive, update_facets
 from .processors import get_facet_processors
@@ -21,9 +25,12 @@ def get_facets(path, partial=True):
     archive = FacetsArchive(fsal, exts.databases.facets,
                             config=supervisor.config)
     facets = archive.get_facets(path)
-    if not facets and partial:
-        facets = generate_partial_facets(path, supervisor, fsal)
-        # TODO: Schedule a facet generation with metadata extraction
+    if not facets:
+        logging.debug("Facets not found for '{}'. Scheduling generation".format(
+            path))
+        schedule_facets_generation(path, archive)
+        if partial:
+            facets = generate_partial_facets(path, supervisor, fsal)
     return facets
 
 
@@ -35,18 +42,24 @@ def generate_partial_facets(path, supervisor, fsal):
     for f in files:
         for processor in get_facet_processors(fsal, path, f.name):
             processor.add_file(facets, f.name, partial=True)
-    stuff_path(facets, path)
+    fill_path(facets, path)
     update_facets(facets)
     return Facets(supervisor, path, facets)
 
 
-def stuff_path(facets, path):
-    if not isinstance(facets, dict):
+def fill_path(data, path):
+    if not isinstance(data, dict):
         return
-    facets['path'] = path
-    for key, value in facets.iteritems():
+    data['path'] = path
+    for key, value in data.iteritems():
         if isinstance(value, dict):
-            stuff_path(value, path)
+            fill_path(value, path)
         elif isinstance(value, list):
             for row in value:
-                stuff_path(row, path)
+                fill_path(row, path)
+
+
+def schedule_facets_generation(path, archive):
+    exts.tasks.schedule(update_facets_for_dir,
+                        kwargs=dict(archive=archive,
+                                    path=path))
