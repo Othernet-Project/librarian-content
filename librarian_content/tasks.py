@@ -87,18 +87,19 @@ def check_new_content(supervisor):
     return changes_found
 
 
-def update_facets_for_dir(path, archive):
-    logging.debug(u'Scheduled facet generation triggered for {}'.format(path))
-    success, dirs, files = exts.fsal.list_dir(path)
-    if not success:
-        logging.debug(u'Facet generation cancelled. {} does not exist'.format(
+def generate_facets(paths, archive):
+    for path in paths:
+        logging.debug(u'Scheduled facet generation triggered for {}'.format(
             path))
-        return
-    facets = archive.get_facets(path)
-    if facets:
-        logging.debug(u'Facets already generated for {}. Ignoring.'.format(
-            path))
-        return
-    for f in files:
-        logging.info(u"Adding file to facets archive: '{}'".format(f.rel_path))
-        archive.add_or_update_to_facets(f.rel_path)
+        success, fso = exts.fsal.get_fso(path)
+        if not success:
+            logging.debug(u'Facet gen cancelled. {} does not exist'.format(
+                path))
+            continue
+        facets = archive.get_facets(path)
+        if facets:
+            logging.debug(u'Facets already generated for {}'.format(
+                path))
+            continue
+        logging.debug(u"Generating facets for '{}'".format(path))
+        archive.update_facets(path)
