@@ -1,7 +1,7 @@
 SQL = """
 create table video
 (
-    path varchar primary key
+    path varchar primary key unique not null
 );
 
 create table clips
@@ -15,7 +15,7 @@ create table clips
     width integer,
     height integer,
     thumbnail varchar,
-    unique(path, file)
+    unique(path, file) on conflict replace
 );
 """
 

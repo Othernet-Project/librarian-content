@@ -19,7 +19,7 @@ CONTENT_ORDER = ['-date(updated)', '-views']
 
 def multiarg(query, n):
     """ Returns version of query where '??' is replaced by n placeholders """
-    return query.replace('??', ', '.join(['%s'] * n))
+    return query.replace('??', ', '.join(['?'] * n))
 
 
 class AttrDict(dict):
@@ -148,23 +148,24 @@ class EmbeddedArchive(BaseArchive):
 
     def _add_filters(self, q, terms, lang, content_type):
         if lang:
-            q.where += 'language = %(lang)s'
+            q.where += 'language = :lang'
 
         if terms:
-            q.where += ('title ILIKE %(terms)s OR '
-                        'publisher ILIKE %(terms)s OR '
-                        'keywords ILIKE %(terms)s')
+            q.where += ('title LIKE :terms OR '
+                        'publisher LIKE :terms OR '
+                        'keywords LIKE :terms'
+                        'COLLATE NOCASE')
 
         if content_type:
             # get integer representation of content type
             content_type_id = metadata.CONTENT_TYPES[content_type]
-            q.where += '("content_type" & %(content_type)s) = %(content_type)s'
+            q.where += '("content_type" & :content_type) = :content_type'
         else:
             # exclude content types that cannot be displayed on the mixed type
             # content list
             content_type_id = sum([metadata.CONTENT_TYPES[name]
                                    for name in self.exclude_from_content_list])
-            qs = '("content_type" & %(content_type)s) != %(content_type)s'
+            qs = '("content_type" & :content_type) != :content_type'
             q.where += qs
 
         return (q, content_type_id)
@@ -172,7 +173,7 @@ class EmbeddedArchive(BaseArchive):
     def get_count(self, terms=None, lang=None, content_type=None):
         q = self.db.Select('COUNT(*) as count',
                            sets='content',
-                           where='disabled = false')
+                           where='disabled = 0')
         (q, content_type_id) = self._add_filters(q,
                                                  terms,
                                                  lang,
@@ -187,7 +188,7 @@ class EmbeddedArchive(BaseArchive):
                     content_type=None):
         # TODO: tests
         q = self.db.Select(sets='content',
-                           where='disabled = false',
+                           where='disabled = 0',
                            order=CONTENT_ORDER,
                            limit=limit,
                            offset=offset)
@@ -206,7 +207,7 @@ class EmbeddedArchive(BaseArchive):
         return results
 
     def _fetch(self, table, relpath, dest, many=False):
-        q = self.db.Select(sets=table, where='path = %s')
+        q = self.db.Select(sets=table, where='path = ?')
         fetcher = self.one if not many else self.many
         dest[table] = fetcher(q, (relpath,))
         relations = self.schema[table].get('relations', {})
@@ -218,7 +219,7 @@ class EmbeddedArchive(BaseArchive):
                             many=relation == 'many')
 
     def get_single(self, relpath):
-        q = self.db.Select(sets='content', where='path = %s')
+        q = self.db.Select(sets='content', where='path = ?')
         data = self.one(q, (relpath,))
         if data:
             for content_type, mask in metadata.CONTENT_TYPES.items():
@@ -244,10 +245,7 @@ class EmbeddedArchive(BaseArchive):
             else:
                 primitives[key] = value
 
-        constraints = self.schema[table_name]['constraints']
-        q = self.db.Replace(table_name,
-                            constraints=constraints,
-                            cols=primitives.keys())
+        q = self.db.Replace(table_name, cols=primitives.keys())
         self.db.execute(q, primitives)
 
     def add_meta_to_db(self, metadata):
@@ -260,17 +258,17 @@ class EmbeddedArchive(BaseArchive):
             if replaces:
                 msg = "Removing replaced content from archive database."
                 logging.debug(msg)
-                q = self.db.Delete('content', where='path = %s')
+                q = self.db.Delete('content', where='path = ?')
                 self.db.execute(q, (replaces,))
 
         return True
 
     def remove_meta_from_db(self, relpath):
         with self.db.transaction():
-            q = self.db.Delete('content', where='path = %s')
+            q = self.db.Delete('content', where='path = ?')
             rowcount = self.db.execute(q, (relpath,))
             for table in self.schema.keys():
-                q = self.db.Delete(table, where='path = %s')
+                q = self.db.Delete(table, where='path = ?')
                 self.db.execute(q, (relpath,))
             return rowcount
 
@@ -299,7 +297,7 @@ class EmbeddedArchive(BaseArchive):
         :param relpath:  Relative path of content item
         :returns:        ``True`` if successful, ``False`` otherwise
         """
-        q = self.db.Update('content', views='views + 1', where='path = %s')
+        q = self.db.Update('content', views='views + 1', where='path = ?')
         rowcount = self.db.execute(q, (relpath,))
         assert rowcount == 1, 'Updated more than one row'
         return rowcount
@@ -308,7 +306,7 @@ class EmbeddedArchive(BaseArchive):
         """ Whether content needs formatting patch """
         q = self.db.Select('keep_formatting',
                            sets='content',
-                           where='path = %s')
+                           where='path = ?')
         result = self.db.fetchone(q, (relpath,))
         return not result['keep_formatting']
 

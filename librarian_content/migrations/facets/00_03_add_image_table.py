@@ -1,7 +1,7 @@
 SQL = """
 create table image
 (
-    path varchar primary key
+    path varchar primary key unique not null
 );
 
 create table gallery
@@ -11,7 +11,7 @@ create table gallery
     title varchar,
     width int,
     height int,
-    unique(path, file)
+    unique(path, file) on conflict replace
 );
 """
 

@@ -142,7 +142,7 @@ class FacetsArchive(object):
         return facets
 
     def get_facets(self, path):
-        q = self.db.Select(sets='facets', where='path = %s')
+        q = self.db.Select(sets='facets', where='path = ?')
         data = self.one(q, (path,))
         if data:
             for facet_type, mask in FACET_TYPES.items():
@@ -178,7 +178,7 @@ class FacetsArchive(object):
                 self.reload(d.rel_path)
 
     def _fetch(self, table, relpath, dest, many=False):
-        q = self.db.Select(sets=table, where='path = %s')
+        q = self.db.Select(sets=table, where='path = ?')
         if 'order' in self.schema[table]:
             q.order = self.schema[table]['order']
         fetcher = self.one if not many else self.many
@@ -223,10 +223,7 @@ class FacetsArchive(object):
                     self._remove(key, value)
 
             if old_primitives != new_primitives:
-                constraints = self.schema[table_name]['constraints']
-                q = self.db.Replace(table_name,
-                                    constraints=constraints,
-                                    cols=new_primitives.keys())
+                q = self.db.Replace(table_name, cols=new_primitives.keys())
                 self.db.execute(q, new_primitives)
         else:
             self._remove(table_name, old_data)
@@ -244,7 +241,7 @@ class FacetsArchive(object):
                     primitives[key] = value
             q = self.db.Delete(table_name)
             for key in primitives.keys():
-                q.where &= '{0} = %({0})s'.format(key)
+                q.where &= '{0} = :{0}'.format(key)
             self.db.execute(q, primitives)
 
     def _remove_facets(self, facets):

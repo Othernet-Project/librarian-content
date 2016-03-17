@@ -1,19 +1,19 @@
 SQL = """
 create table image
 (
-    path varchar primary key,
+    path varchar primary key unique not null,
     description varchar
 );
 
 create table album
 (
-    path varchar primary key,
+    path varchar,
     file varchar,
     thumbnail varchar,
     caption varchar,
     title varchar,
     resolution varchar,
-    unique(path, file)
+    unique(path, file) on conflict replace
 );
 """
 

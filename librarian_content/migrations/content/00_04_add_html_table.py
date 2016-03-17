@@ -1,8 +1,8 @@
 SQL = """
 create table html
 (
-    path varchar primary key,
-    keep_formatting boolean not null default false,
+    path varchar primary key unique not null,
+    keep_formatting boolean not null default 0,
     main varchar not null default 'index.html'
 );
 """
