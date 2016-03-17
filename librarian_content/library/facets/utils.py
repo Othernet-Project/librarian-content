@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+import os
 import itertools
 import logging
 
@@ -9,8 +10,11 @@ from librarian_core.exts import ext_container as exts
 
 from .facets import Facets
 from ...tasks import generate_facets
-from .processors import get_facet_processors
 from .archive import FacetsArchive, split_path
+from .processors import (get_facet_processors,
+                         split_name,
+                         is_html_file,
+                         HtmlFacetProcessor)
 
 
 def get_facets(paths, partial=True, facet_type=None):
@@ -33,6 +37,20 @@ def get_facets(paths, partial=True, facet_type=None):
                                    archive=archive)
     return
 
+
+def find_html_index(paths):
+    first_html_file = None
+    best_html_file, best_html_index = (None, 10000)
+    for path in paths:
+        fname = os.path.basename(path)
+        name, ext = split_name(fname)
+        if is_html_file(ext):
+            first_html_file = first_html_file or fname
+            for i, index_name in enumerate(HtmlFacetProcessor.INDEX_NAMES):
+                if name in index_name and i < best_html_index:
+                    best_html_file = fname
+                    best_html_index = i
+    return best_html_file or first_html_file
 
 def get_facet_types(paths):
     facet_types = ['generic']

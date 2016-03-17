@@ -24,6 +24,9 @@ def strip_extension(fname):
     return name
 
 
+def is_html_file(ext):
+    return ext in HtmlFacetProcessor.EXTENSIONS
+
 def get_facet_processors(path):
     all_processors = FacetProcessorBase.subclasses()
     valid_processors = [p() for p in all_processors if p.can_process(path)]
@@ -42,7 +45,7 @@ class FacetProcessorBase(object):
     def process_file(self, facets, path, partial=False):
         facets.update(self._get_metadata(path, partial))
 
-    def _get_metadata(path, partial):
+    def _get_metadata(self, path, partial):
         raise NotImplemented()
 
     @classmethod
@@ -96,6 +99,17 @@ class FacetProcessorBase(object):
             callback(srcpath, result)
 
         return result
+
+
+class HtmlFacetProcessor(FacetProcessorBase):
+    name = 'html'
+
+    EXTENSIONS = ['html', 'htm']
+
+    INDEX_NAMES = ['index', 'main', 'start']
+
+    def _get_metadata(self, path, partial):
+        return {}
 
 
 class ImageFacetProcessor(FacetProcessorBase):
