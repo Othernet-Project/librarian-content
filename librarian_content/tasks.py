@@ -58,15 +58,15 @@ def check_new_content(supervisor):
     changes_found = False
     for event in supervisor.exts.fsal.get_changes():
         changes_found = True
-        if event.is_dir and event.event_type == EVENT_DELETED:
-            logging.info(u"Removing path from facets archive: '{}'".format(event.src))
-            facets_archive.remove_facets(event.src)
-        elif event.event_type in (EVENT_CREATED, EVENT_MODIFIED):
-            logging.info(u"Adding file to facets archive: '{}'".format(event.src))
-            facets_archive.add_or_update_to_facets(event.src)
-        elif event.event_type == EVENT_DELETED:
-            logging.info(u"Removing file from facets archive: '{}'".format(event.src))
-            facets_archive.remove_from_facets(event.src)
+        fpath = event.src
+        is_file = not event.is_dir
+        if is_file and event.event_type in (EVENT_CREATED, EVENT_MODIFIED):
+            logging.info(u"Adding file to facets archive: '{}'".format(fpath))
+            facets_archive.update_facets(fpath)
+        elif is_file and event.event_type == EVENT_DELETED:
+            logging.info(u"Removing file from facets archive: '{}'".format(
+                fpath))
+            facets_archive.remove_facets(fpath)
 
         path = os.path.dirname(event.src)
         if is_content(event, config['library.metadata']):
