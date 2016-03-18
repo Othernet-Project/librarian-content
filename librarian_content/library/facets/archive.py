@@ -112,15 +112,18 @@ class FacetsArchive(object):
         if not data and init:
             data = {'path': parent, 'file': name}
         if facet_type:
-            data = self.filter_type(data, facet_type)
+            data = self.apply_key_filter(data, facet_type)
         if data:
             return Facets(supervisor=None, path=None, data=data)
         else:
             return None
 
     def update_facets(self, path):
+        processors = get_facet_processors(path)
+        if not processors:
+            return
         facets = self.get_facets(path, init=True)
-        for processor in get_facet_processors(path):
+        for processor in processors:
             processor.process_file(facets, path)
         return self.save_facets(facets)
 
@@ -163,7 +166,7 @@ class FacetsArchive(object):
         return filter_keys(facets, cls.ALL_KEYS)
 
     @classmethod
-    def filter_type(cls, facets, facet_type):
+    def apply_key_filter(cls, facets, facet_type):
         if facet_type not in cls.FACET_TYPES_KEYS:
             raise ValueError('Invalid facet_type to filter by: {}'.format(
                 facet_type))
