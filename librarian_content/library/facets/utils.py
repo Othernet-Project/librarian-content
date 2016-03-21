@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
-import copy
+import os
+import itertools
 import logging
 
 from bottle import request
@@ -8,61 +9,92 @@ from bottle import request
 from librarian_core.exts import ext_container as exts
 
 from .facets import Facets
-from ...tasks import update_facets_for_dir
-from .processors import get_facet_processors
-from .archive import FacetsArchive, update_facets
+from ...tasks import generate_facets
+from .archive import FacetsArchive, split_path
+from .processors import (get_facet_processors,
+                         split_name,
+                         is_html_file,
+                         HtmlFacetProcessor)
 
 
-BASE_FACETS = {
-    'generic': {
-        'path': ''
-    }
-}
-
-
-def get_facets(path, partial=True):
+def get_facets(paths, partial=True, facet_type=None):
     supervisor = request.app.supervisor
     fsal = exts.fsal
     archive = FacetsArchive(fsal, exts.databases.facets,
                             config=supervisor.config)
-    facets = archive.get_facets(path)
-    if not facets:
-        logging.debug("Facets not found for '{}'."
-                      " Scheduling generation".format(path))
-        schedule_facets_generation(path, archive, config=supervisor.config)
-        if partial:
-            facets = generate_partial_facets(path, supervisor, fsal)
-    return facets
+    schedule_paths = []
+    for path in paths:
+        facets = archive.get_facets(path, facet_type=facet_type)
+        if not facets:
+            logging.debug("Facets not found for '{}'."
+                          " Scheduling generation".format(path))
+            schedule_paths.append(path)
+            if partial:
+                facets = generate_partial_facets(path, supervisor, fsal)
+        yield facets
+    if schedule_paths:
+        schedule_facets_generation(supervisor.config, paths=schedule_paths,
+                                   archive=archive)
+    return
+
+
+def find_html_index(paths):
+    first_html_file = None
+    best_html_file, best_html_index = (None, 10000)
+    for path in paths:
+        fname = os.path.basename(path)
+        name, ext = split_name(fname)
+        if is_html_file(ext):
+            first_html_file = first_html_file or fname
+            for i, index_name in enumerate(HtmlFacetProcessor.INDEX_NAMES):
+                if name in index_name and i < best_html_index:
+                    best_html_file = fname
+                    best_html_index = i
+    return best_html_file or first_html_file
+
+def get_facet_types(paths):
+    facet_types = ['generic']
+    for path in paths:
+        types = [p.name for p in get_facet_processors(path)]
+        facet_types.extend(types)
+    return list(set(facet_types))
+
+
+def filter_by_facet_type(paths, facet_type):
+    return itertools.ifilter(lambda path: is_facet_valid(path, facet_type),
+                             paths)
+
+
+def is_facet_valid(path, facet_type):
+    processors = get_facet_processors(path)
+    for p in processors:
+        if p.name == facet_type:
+            return True
+    return False
 
 
 def generate_partial_facets(path, supervisor, fsal):
-    success, dirs, files = fsal.list_dir(path)
+    success, fso = fsal.get_fso(path)
     if not success:
         return None
-    facets = copy.deepcopy(BASE_FACETS)
-    for f in files:
-        for processor in get_facet_processors(fsal, path, f.name):
-            processor.add_file(facets, f.name, partial=True)
-    fill_path(facets, path)
-    update_facets(facets)
+
+    parent, name = split_path(path)
+    facets = {'path': parent, 'file': name}
+    for processor in get_facet_processors(path):
+        processor.process_file(facets, path, partial=True)
     return Facets(supervisor, path, facets)
 
 
-def fill_path(data, path):
-    if not isinstance(data, dict):
-        return
-    data['path'] = path
-    for key, value in data.iteritems():
-        if isinstance(value, dict):
-            fill_path(value, path)
-        elif isinstance(value, list):
-            for row in value:
-                fill_path(row, path)
-
-
-def schedule_facets_generation(path, archive, config):
+def schedule_facets_generation(config, *args, **kwargs):
     delay = config.get('facets.ondemand_delay', 0)
-    kwargs = dict(archive=archive, path=path)
-    exts.tasks.schedule(update_facets_for_dir,
+    exts.tasks.schedule(generate_facets,
+                        args=args,
                         kwargs=kwargs,
                         delay=delay)
+
+
+# TODO: Remove this after facets become stable
+def log_facets(prefix, facets):
+    import pprint
+    import logging
+    logging.debug('{} {}'.format(prefix, pprint.pformat(dict(facets))))

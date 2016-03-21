@@ -1,20 +1,20 @@
 """
 archive.py: Facets archive
-
 Copyright 2014-2015, Outernet Inc.
 Some rights reserved.
-
 This software is free software licensed under the terms of GPLv3. See COPYING
 file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 """
 
 import os
-import copy
 import logging
 import functools
 
-from .facets import Facets, FACET_TYPES
+from .facets import Facets
 from .processors import get_facet_processors
+
+
+ROOT_PATH = '.'
 
 
 class AttrDict(dict):
@@ -47,52 +47,48 @@ def to_dict_list(func):
     return wrapper
 
 
-def update_facets(facets):
-    facet_types = 0
-    for k, v in FACET_TYPES.items():
-        if k in facets:
-            facet_types |= v
-    facets['facet_types'] = facet_types
+def split_path(path):
+    parent, name = os.path.split(path)
+    parent = parent or ROOT_PATH
+    return parent, name
+
+
+def filter_keys(data, valid_keys):
+    if not data:
+        return data
+
+    filtered_data = {}
+    for key, value in data.items():
+        if key in valid_keys:
+            filtered_data[key] = value
+    return filtered_data
 
 
 class FacetsArchive(object):
-    ROOT_PATH = '.'
 
-    schema = {
-        'facets': {
-            'constraints': ['path']
-        },
-        'generic': {
-            'constraints': ['path']
-        },
-        'html': {
-            'constraints': ['path', 'index']
-        },
-        'video': {
-            'relations': {'many': ['clips']},
-            'constraints': ['path']
-        },
-        'audio': {
-            'relations': {'many': ['playlist']},
-            'constraints': ['path']
-        },
-        'image': {
-            'relations': {'many': ['gallery']},
-            'constraints': ['path']
-        },
-        'playlist': {
-            'constraints': ['path', 'file'],
-            'order': ['file']
-        },
-        'gallery': {
-            'constraints': ['path', 'file'],
-            'order': ['file']
-        },
-        'clips': {
-            'constraints': ['path', 'file'],
-            'order': ['file']
-        },
+    ALL_KEYS = [
+        'path',
+        'file',
+        'author',
+        'description',
+        'title',
+        'genre',
+        'album',
+        'width',
+        'height',
+        'duration',
+    ]
+
+    FACET_TYPES_KEYS = {
+        'common': ['path', 'file'],
+        'generic': [],
+        'audio': ['author', 'title', 'album', 'genre', 'duration'],
+        'video': ['author', 'title', 'description', 'width',
+                  'height', 'duration'],
+        'image': ['title', 'width', 'height'],
     }
+
+    TABLE = 'facets'
 
     def __init__(self, fsal, db, config):
         self.fsal = fsal
@@ -107,55 +103,40 @@ class FacetsArchive(object):
     def many(self, *args, **kwargs):
         return self.db.fetchall(*args, **kwargs)
 
-    def add_or_update_to_facets(self, path):
-        root = os.path.dirname(path) or self.ROOT_PATH
-        relpath = os.path.relpath(path, root)
-        current_facets = self.get_or_init_facets(root)
-        new_facets = copy.deepcopy(current_facets)
-        for processor in get_facet_processors(self.fsal, root, relpath):
-            processor.add_file(new_facets, relpath)
-        update_facets(new_facets)
-        self.save_facets(current_facets, new_facets)
-
-    def remove_from_facets(self, path):
-        root = os.path.dirname(path)
-        relpath = os.path.relpath(path, root)
-        current_facets = self.get_facets(root)
-        if current_facets:
-            new_facets = copy.deepcopy(current_facets)
-            for processor in get_facet_processors(self.fsal, root, relpath):
-                processor.remove_file(new_facets, relpath)
-            update_facets(new_facets)
-            self.save_facets(current_facets, new_facets)
-
-    def remove_facets(self, path):
-        facets = self.get_facets(path)
-        if facets:
-            self._remove_facets(facets)
-
-    def get_or_init_facets(self, path):
-        facets = self.get_facets(path)
-        if not facets:
-            data = {'path': path}
-            facets = Facets(supervisor=None, path=None, data=data)
-        update_facets(facets)
-        return facets
-
-    def get_facets(self, path):
-        q = self.db.Select(sets='facets', where='path = ?')
-        data = self.one(q, (path,))
+    def get_facets(self, path, init=False, facet_type=None):
+        parent, name = split_path(path)
+        q = self.db.Select(sets=self.TABLE, where='path = ? and file = ?')
+        data = self.one(q, (parent, name))
+        if not data and init:
+            data = {'path': parent, 'file': name}
+        if facet_type:
+            data = self.apply_key_filter(data, facet_type)
         if data:
-            for facet_type, mask in FACET_TYPES.items():
-                if data['facet_types'] & mask == mask:
-                    self._fetch(facet_type, path, data)
             return Facets(supervisor=None, path=None, data=data)
         else:
             return None
 
-    def save_facets(self, old_facets, new_facets):
+    def update_facets(self, path):
+        processors = get_facet_processors(path)
+        if not processors:
+            return
+        facets = self.get_facets(path, init=True)
+        for processor in processors:
+            processor.process_file(facets, path)
+        return self.save_facets(facets)
+
+    def remove_facets(self, path):
         with self.db.transaction():
-            self._write('facets', old_facets, new_facets, shared_data={'path': new_facets['path']})
-        return True
+            parent, name = split_path(path)
+            query = self.db.Delete(self.TABLE, where='path = ? and file = ?')
+            self.db.execute(query, (parent, name))
+
+    def save_facets(self, facets):
+        facets = self.cleanse(facets)
+        with self.db.transaction():
+            q = self.db.Replace(self.TABLE, cols=facets.keys())
+            self.db.execute(q, facets)
+        return facets
 
     def clear_and_reload(self):
         with self.db.transaction():
@@ -163,87 +144,29 @@ class FacetsArchive(object):
             self.reload()
 
     def clear(self):
-        for table in self.schema.keys():
-            q = self.db.Delete(table)
-            self.db.execute(q)
+        q = self.db.Delete(self.TABLE)
+        self.db.execute(q)
 
     def reload(self, path=None):
-        path = path or '.'
+        path = path or ROOT_PATH
         (success, dirs, files) = self.fsal.list_dir(path)
         if success:
             for f in files:
                 logging.debug("Adding file to facets: '{}'".format(f.rel_path))
-                self.add_to_facets(f.rel_path)
+                self.update_facets(f.rel_path)
             for d in dirs:
                 self.reload(d.rel_path)
 
-    def _fetch(self, table, relpath, dest, many=False):
-        q = self.db.Select(sets=table, where='path = ?')
-        if 'order' in self.schema[table]:
-            q.order = self.schema[table]['order']
-        fetcher = self.one if not many else self.many
-        dest[table] = fetcher(q, (relpath,))
-        relations = self.schema[table].get('relations', {})
-        for relation, related_tables in relations.items():
-            for rel_table in related_tables:
-                self._fetch(rel_table,
-                            relpath,
-                            dest[table],
-                            many=relation == 'many')
+    @classmethod
+    def cleanse(cls, facets):
+        return filter_keys(facets, cls.ALL_KEYS)
 
-    def _write(self, table_name, old_data, new_data, shared_data=None):
-        if new_data:
-            new_data.update(shared_data)
-            new_primitives = {}
-            old_primitives = {}
-            for key, value in new_data.items():
-                old_value = old_data.get(key, None) if old_data else None
-                if isinstance(value, dict):
-                    self._write(key, old_value, value, shared_data=shared_data)
-                elif isinstance(value, list):
-                    # For an items present in the old list but not in new list
-                    # write them out
-                    for row in old_value or list():
-                        if row not in value:
-                            self._remove(key, row)
-                    for row in value:
-                        old_row = row if old_value and row in old_value else None
-                        self._write(key, old_row, row, shared_data=shared_data)
-                else:
-                    new_primitives[key] = value
-                    old_primitives[key] = old_value
+    @classmethod
+    def apply_key_filter(cls, facets, facet_type):
+        if facet_type not in cls.FACET_TYPES_KEYS:
+            raise ValueError('Invalid facet_type to filter by: {}'.format(
+                facet_type))
 
-            if old_data:
-                # Delete all entries which should no longer exist
-                old_keys = set(old_data.keys())
-                new_keys = set(new_data.keys())
-                removed_keys = old_keys - (old_keys.intersection(new_keys))
-                for key in removed_keys:
-                    value = old_data[key]
-                    self._remove(key, value)
-
-            if old_primitives != new_primitives:
-                q = self.db.Replace(table_name, cols=new_primitives.keys())
-                self.db.execute(q, new_primitives)
-        else:
-            self._remove(table_name, old_data)
-
-    def _remove(self, table_name, old_data):
-        if old_data:
-            primitives = {}
-            for key, value in old_data.items():
-                if isinstance(value, dict):
-                    self._remove(key, value)
-                elif isinstance(value, list):
-                    for row in value:
-                        self._remove(key, row)
-                else:
-                    primitives[key] = value
-            q = self.db.Delete(table_name)
-            for key in primitives.keys():
-                q.where &= '{0} = :{0}'.format(key)
-            self.db.execute(q, primitives)
-
-    def _remove_facets(self, facets):
-        with self.db.transaction():
-            self._remove('facets', facets)
+        master_keys = cls.FACET_TYPES_KEYS
+        allowed_keys = master_keys['common'] + master_keys[facet_type]
+        return filter_keys(facets, allowed_keys)

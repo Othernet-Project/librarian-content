@@ -1,8 +1,17 @@
 SQL = """
 create table facets
 (
-    path varchar primary key unique not null,
-    facet_types int not null default 1  --default type is general
+    path varchar not null,
+    file varchar not null,
+    author varchar default '',
+    description varchar default '',
+    title varchar default '',
+    genre varchar default '',
+    album varchar default '',
+    width int default 0,
+    height int default 0,
+    duration int default 0,
+    unique(path, file)
 );
 """
 
