@@ -78,8 +78,8 @@ def check_new_content(supervisor):
                 logging.info(u"Content removed from filesystem: '{}'."
                              " Removing it from the library...".format(path))
                 archive.remove_from_archive(path, delete_files=False)
-        else:
-            supervisor.exts.events.publish('FS_EVENT', event)
+
+        supervisor.exts.events.publish('FS_EVENT', event)
 
     if changes_found:
         supervisor.exts.cache.invalidate('content')
