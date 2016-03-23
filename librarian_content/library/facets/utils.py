@@ -52,8 +52,9 @@ def find_html_index(paths):
                     best_html_index = i
     return best_html_file or first_html_file
 
+
 def get_facet_types(paths):
-    facet_types = ['generic']
+    facet_types = ['generic', 'updates']
     for path in paths:
         types = [p.name for p in get_facet_processors(path)]
         facet_types.extend(types)
