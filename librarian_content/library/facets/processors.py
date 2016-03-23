@@ -2,6 +2,7 @@ import os
 
 from librarian_core.exts import ext_container as exts
 
+from .facets import FACET_TYPES
 from .metadata import runnable, ImageMetadata, AudioMetadata, VideoMetadata
 
 
@@ -27,6 +28,7 @@ def strip_extension(fname):
 def is_html_file(ext):
     return ext in HtmlFacetProcessor.EXTENSIONS
 
+
 def get_facet_processors(path):
     all_processors = FacetProcessorBase.subclasses()
     valid_processors = [p() for p in all_processors if p.can_process(path)]
@@ -43,7 +45,10 @@ class FacetProcessorBase(object):
         self.fsal = exts.fsal
 
     def process_file(self, facets, path, partial=False):
-        facets.update(self._get_metadata(path, partial))
+        meta = self._get_metadata(path, partial)
+        facets.update(meta)
+        facets['facet_types'] |= FACET_TYPES[self.name]
+        return True
 
     def _get_metadata(self, path, partial):
         raise NotImplemented()
@@ -99,6 +104,13 @@ class FacetProcessorBase(object):
             callback(srcpath, result)
 
         return result
+
+
+class GenericFacetProcessor(FacetProcessorBase):
+    name = 'generic'
+
+    def _get_metadata(self, *args, **kwargs):
+        return {}
 
 
 class HtmlFacetProcessor(FacetProcessorBase):

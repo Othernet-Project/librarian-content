@@ -17,11 +17,18 @@ from .processors import (get_facet_processors,
                          HtmlFacetProcessor)
 
 
+def get_archive(db=None, config=None):
+    if not db:
+        db = exts.databases.facets
+    if not config:
+        config = request.app.supervisor.config
+    fsal = exts.fsal
+    return FacetsArchive(db=db, config=config, fsal=fsal)
+
+
 def get_facets(paths, partial=True, facet_type=None):
     supervisor = request.app.supervisor
-    fsal = exts.fsal
-    archive = FacetsArchive(fsal, exts.databases.facets,
-                            config=supervisor.config)
+    archive = get_archive()
     schedule_paths = []
     for path in paths:
         facets = archive.get_facets(path, facet_type=facet_type)
@@ -30,7 +37,7 @@ def get_facets(paths, partial=True, facet_type=None):
                           " Scheduling generation".format(path))
             schedule_paths.append(path)
             if partial:
-                facets = generate_partial_facets(path, supervisor, fsal)
+                facets = generate_partial_facets(path, supervisor)
         yield facets
     if schedule_paths:
         schedule_facets_generation(supervisor.config, paths=schedule_paths,
@@ -73,7 +80,8 @@ def is_facet_valid(path, facet_type):
     return False
 
 
-def generate_partial_facets(path, supervisor, fsal):
+def generate_partial_facets(path, supervisor):
+    fsal = exts.fsal
     success, fso = fsal.get_fso(path)
     if not success:
         return None

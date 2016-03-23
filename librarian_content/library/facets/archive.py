@@ -11,8 +11,9 @@ file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 import os
 import logging
 import functools
+import itertools
 
-from .facets import Facets
+from .facets import Facets, FACET_TYPES
 from .processors import get_facet_processors
 
 
@@ -79,15 +80,25 @@ class FacetsArchive(object):
         'width',
         'height',
         'duration',
+        'facet_types'
     ]
 
+    SEARCH_KEYS = {
+        'generic': [],
+        'audio': ['author', 'title', 'genre', 'album'],
+        'video': ['author', 'title', 'description'],
+        'image': ['title'],
+        'html': []
+    }
+
     FACET_TYPES_KEYS = {
-        'common': ['path', 'file'],
+        'common': ['path', 'file', 'facet_types'],
         'generic': [],
         'audio': ['author', 'title', 'album', 'genre', 'duration'],
         'video': ['author', 'title', 'description', 'width',
                   'height', 'duration'],
         'image': ['title', 'width', 'height'],
+        'html': []
     }
 
     TABLE = 'facets'
@@ -110,13 +121,11 @@ class FacetsArchive(object):
         q = self.db.Select(sets=self.TABLE, where='path = %s and file =%s')
         data = self.one(q, (parent, name))
         if not data and init:
-            data = {'path': parent, 'file': name}
+            data = {'path': parent, 'file': name, 'facet_types': 1}
         if facet_type:
             data = self.apply_key_filter(data, facet_type)
         if data:
             return Facets(supervisor=None, path=None, data=data)
-        else:
-            return None
 
     def update_facets(self, path):
         processors = get_facet_processors(path)
@@ -141,6 +150,31 @@ class FacetsArchive(object):
                                 cols=facets.keys())
             self.db.execute(q, facets)
         return facets
+
+    def search(self, terms=None, facet_type=None):
+        q = self.db.Select(sets=self.TABLE)
+        facet_type_id = self._generate_filter(q,
+                                              terms=terms,
+                                              facet_type=facet_type)
+        terms = '%' + terms.lower() + '%'
+        return self.db.fetchiter(q, dict(terms=terms,
+                                         facet_type=facet_type_id))
+
+    def _generate_filter(self, q, terms=None, facet_type=None):
+        if terms:
+            cols = self._search_keys(facet_type)
+            q.where += ' OR '.join(
+                '{} ILIKE %(terms)s'.format(col) for col in cols)
+        if facet_type:
+            q.where += '(facet_types & %(facet_type)s) = %(facet_type)s'
+            return FACET_TYPES[facet_type]
+
+    def _search_keys(self, facet_type=None):
+        if facet_type:
+            keys = self.SEARCH_KEYS[facet_type]
+        else:
+            keys = itertools.chain(*self.SEARCH_KEYS.itervalues())
+        return set(keys)
 
     def clear_and_reload(self):
         with self.db.transaction():
