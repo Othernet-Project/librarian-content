@@ -1,3 +1,5 @@
+import functools
+
 from bottle_utils.common import to_bytes
 
 from librarian_core.contrib.cache.utils import generate_key
@@ -50,7 +52,7 @@ class CDFObject(object):
         return instance
 
     @classmethod
-    def from_db(cls, supervisor, paths):
+    def from_db(cls, supervisor, paths, immediate=False):
         """Read multiple entries from database and cache the retrieved raw data.
         If no entries are found in the database, a background task will be
         scheduled to read the data from file."""
@@ -84,12 +86,15 @@ class CDFObject(object):
             key = cls.get_cache_key(path)
             supervisor.exts.cache.set(key, data)
         # ids that were not found neither in cache, nor in the database are
-        # scheduled to be read later from file
+        # scheduled to be read from file
         for path in found.symmetric_difference(remaining):
             if cls.ATTEMPT_READ_FROM_FILE:
-                supervisor.exts.tasks.schedule(cls.from_file,
-                                               args=(supervisor, path))
-            if cls.ALLOW_EMPTY_INSTANCES:
+                dinfo_gen = functools.partial(cls.from_file, supervisor, path)
+                if immediate:
+                    instances[path] = dinfo_gen()
+                else:
+                    supervisor.exts.tasks.schedule(dinfo_gen)
+            if cls.ALLOW_EMPTY_INSTANCES and path not in instances:
                 instances[path] = cls(supervisor, path)
 
         return instances

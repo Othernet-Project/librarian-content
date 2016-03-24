@@ -21,6 +21,7 @@ setup(
     install_requires=[
         'outernet_metadata',
         'librarian_core',
+        'beautifulsoup4'
         'fsal',
     ],
     dependency_links=[
