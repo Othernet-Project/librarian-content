@@ -9,7 +9,6 @@ from bottle import request
 from librarian_core.exts import ext_container as exts
 
 from .facets import Facets
-from ...tasks import generate_facets
 from .archive import FacetsArchive, split_path
 from .processors import (get_facet_processors,
                          split_name,
@@ -100,6 +99,24 @@ def schedule_facets_generation(config, *args, **kwargs):
                         args=args,
                         kwargs=kwargs,
                         delay=delay)
+
+
+def generate_facets(paths, archive):
+    for path in paths:
+        logging.debug(u'Scheduled facet generation triggered for {}'.format(
+            path))
+        success, fso = exts.fsal.get_fso(path)
+        if not success:
+            logging.debug(u'Facet gen cancelled. {} does not exist'.format(
+                path))
+            continue
+        facets = archive.get_facets(path)
+        if facets:
+            logging.debug(u'Facets already generated for {}'.format(
+                path))
+            continue
+        logging.debug(u"Generating facets for '{}'".format(path))
+        archive.update_facets(path)
 
 
 # TODO: Remove this after facets become stable

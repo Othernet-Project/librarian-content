@@ -1,13 +1,14 @@
 import functools
 import logging
 import os
+import collections
 
 from fsal.events import EVENT_CREATED, EVENT_DELETED, EVENT_MODIFIED
 
 from librarian_core.exts import ext_container as exts
 
 from .library.archive import Archive
-from .library.facets.archive import FacetsArchive
+from .library.facets.utils import get_archive
 
 
 REPEAT_DELAY = 3  # seconds
@@ -52,20 +53,18 @@ def check_new_content(supervisor):
                             supervisor.exts.fsal,
                             supervisor.exts.databases.content,
                             meta_filenames=config['library.metadata'])
-    facets_archive = FacetsArchive(supervisor.exts.fsal,
-                                   supervisor.exts.databases.facets,
-                                   config=config)
+    facets_archive = get_archive(db=supervisor.exts.databases.facets,
+                                 config=config)
     changes_found = False
     for event in supervisor.exts.fsal.get_changes():
         changes_found = True
         fpath = event.src
         is_file = not event.is_dir
         if is_file and event.event_type in (EVENT_CREATED, EVENT_MODIFIED):
-            logging.info(u"Adding file to facets archive: '{}'".format(fpath))
+            logging.info(u"Update files facets: '{}'".format(fpath))
             facets_archive.update_facets(fpath)
         elif is_file and event.event_type == EVENT_DELETED:
-            logging.info(u"Removing file from facets archive: '{}'".format(
-                fpath))
+            logging.info(u"Removing file facets: '{}'".format(fpath))
             facets_archive.remove_facets(fpath)
 
         path = os.path.dirname(event.src)
@@ -87,19 +86,28 @@ def check_new_content(supervisor):
     return changes_found
 
 
-def generate_facets(paths, archive):
-    for path in paths:
-        logging.debug(u'Scheduled facet generation triggered for {}'.format(
-            path))
-        success, fso = exts.fsal.get_fso(path)
-        if not success:
-            logging.debug(u'Facet gen cancelled. {} does not exist'.format(
-                path))
-            continue
-        facets = archive.get_facets(path)
-        if facets:
-            logging.debug(u'Facets already generated for {}'.format(
-                path))
-            continue
-        logging.debug(u"Generating facets for '{}'".format(path))
-        archive.update_facets(path)
+def scan_facets(path_queue=None, step_delay=0, config=None):
+    if path_queue is None:
+        path_queue = collections.deque()
+        path_queue.append('.')
+    if not path_queue:
+        logging.info(u'Facets scan complete.')
+        return
+
+    dir_path = path_queue.popleft()
+    logging.debug(u'Scanning facets for files in {}'.format(dir_path))
+    success, dirs, files = exts.fsal.list_dir(dir_path)
+    if not success:
+        logging.warn(
+            u'Facets scan for {} stopped. Invalid path.'.format(dir_path))
+        return
+
+    archive = get_archive(config=config)
+    for f in files:
+        logging.info(u"Update file facets: '{}'".format(f.rel_path))
+        archive.update_facets(f.rel_path)
+    for d in dirs:
+        path_queue.append(d.rel_path)
+    kwargs = dict(path_queue=path_queue, step_delay=step_delay,
+                  config=config)
+    exts.tasks.schedule(scan_facets, kwargs=kwargs)
