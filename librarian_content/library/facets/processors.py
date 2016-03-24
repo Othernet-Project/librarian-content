@@ -117,7 +117,7 @@ class GenericFacetProcessor(FacetProcessorBase):
 class HtmlFacetProcessor(FacetProcessorBase):
     name = 'html'
 
-    EXTENSIONS = ['html', 'htm']
+    EXTENSIONS = ['html', 'htm', 'xhtml']
 
     INDEX_NAMES = ['index', 'main', 'start']
 
