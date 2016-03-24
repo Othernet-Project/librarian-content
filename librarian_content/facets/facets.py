@@ -10,7 +10,7 @@ file that comes with the source code, or http://www.gnu.org/licenses/gpl.txt.
 
 from __future__ import unicode_literals
 
-from ..base import CDFObject
+from .base import CDFObject
 
 
 FACET_TYPES = {

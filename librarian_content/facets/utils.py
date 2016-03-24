@@ -1,12 +1,14 @@
 from __future__ import unicode_literals
 
 import os
+import functools
 import itertools
 import logging
 
 from bottle import request
 
 from librarian_core.exts import ext_container as exts
+from librarian_core.utils import is_string
 
 from .facets import Facets
 from .archive import FacetsArchive, split_path
@@ -14,6 +16,17 @@ from .processors import (get_facet_processors,
                          split_name,
                          is_html_file,
                          HtmlFacetProcessor)
+
+
+def to_list(func):
+    """In case a single string parameter is passed to the function wrapped
+    with this decorator, the single parameter will be wrapped in a list."""
+    @functools.wraps(func)
+    def wrapper(self, arg, **kwargs):
+        if is_string(arg):
+            arg = [arg]
+        return func(self, arg, **kwargs)
+    return wrapper
 
 
 def get_archive(db=None, config=None):
