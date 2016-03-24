@@ -20,7 +20,7 @@ setup(
     long_description=read('README.rst'),
     install_requires=[
         'librarian_core',
-        'beautifulsoup4'
+        'beautifulsoup4',
         'fsal',
     ],
     dependency_links=[
