@@ -215,6 +215,6 @@ class FacetsArchive(object):
         return filter_keys(facets, allowed_keys)
 
     @classmethod
-    def create_partial(path):
+    def create_partial(cls, path):
         parent, name = split_path(path)
         return dict(path=parent, file=name, facet_types=1)
