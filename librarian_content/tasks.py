@@ -33,7 +33,7 @@ def reschedule_content_check(fn):
             if changes_found:
                 refresh_rate = REPEAT_DELAY
             else:
-                max_delay = supervisor.config['library.refresh_rate']
+                max_delay = supervisor.config['facets.refresh_rate']
                 if current_delay + INCREMENT_DELAY <= max_delay:
                     refresh_rate = current_delay + INCREMENT_DELAY
                 else:
