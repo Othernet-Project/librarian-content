@@ -80,6 +80,10 @@ class FacetsArchive(object):
         'width',
         'height',
         'duration',
+        'keywords',
+        'copyright',
+        'language',
+        'outernet_formatting'
         'facet_types'
     ]
 
@@ -88,7 +92,7 @@ class FacetsArchive(object):
         'audio': ['author', 'title', 'genre', 'album'],
         'video': ['author', 'title', 'description'],
         'image': ['title'],
-        'html': []
+        'html': ['author', 'title', 'description', 'keywords']
     }
 
     FACET_TYPES_KEYS = {
@@ -98,7 +102,8 @@ class FacetsArchive(object):
         'video': ['author', 'title', 'description', 'width',
                   'height', 'duration'],
         'image': ['title', 'width', 'height'],
-        'html': []
+        'html': ['author', 'title', 'description', 'keywords', 'language',
+                 'copyright', 'outernet_formatting']
     }
 
     TABLE = 'facets'
