@@ -9,7 +9,6 @@ Installation
 
 The component has the following dependencies:
 
-- outernet_metadata_
 - librarian-core_
 - fsal_
 
@@ -45,5 +44,4 @@ Configuration
 
 .. _librarian: https://github.com/Outernet-Project/librarian
 .. _librarian-core: https://github.com/Outernet-Project/librarian-core
-.. _outernet_metadata: https://github.com/Outernet-Project/outernet_metadata
 .. _fsal: https://github.com/Outernet-Project/fsal
