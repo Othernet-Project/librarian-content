@@ -3,7 +3,8 @@ import os
 from librarian_core.exts import ext_container as exts
 
 from .facets import FACET_TYPES
-from .metadata import runnable, ImageMetadata, AudioMetadata, VideoMetadata
+from .metadata import (runnable, ImageMetadata, AudioMetadata,
+                       VideoMetadata, HtmlMetadata)
 
 
 IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png']
@@ -116,12 +117,24 @@ class GenericFacetProcessor(FacetProcessorBase):
 class HtmlFacetProcessor(FacetProcessorBase):
     name = 'html'
 
-    EXTENSIONS = ['html', 'htm']
+    EXTENSIONS = ['html', 'htm', 'xhtml']
 
     INDEX_NAMES = ['index', 'main', 'start']
 
     def _get_metadata(self, path, partial):
-        return {}
+        if partial:
+            return {}
+        try:
+            meta = HtmlMetadata(self.fsal, path)
+            keys = ('author', 'title', 'description', 'keywords',
+                    'language', 'copyright')
+            data = {}
+            for key in keys:
+                data[key] = getattr(meta, key)
+            data['outernet_formatting'] = (meta.outernet_formatting == 'true')
+            return data
+        except IOError:
+            return {}
 
 
 class ImageFacetProcessor(FacetProcessorBase):

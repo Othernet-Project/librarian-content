@@ -8,6 +8,7 @@ import functools
 import subprocess
 
 from bottle_utils.common import to_unicode
+from bs4 import BeautifulSoup, SoupStrainer
 
 
 FFPROBE_CMD = 'ffprobe -v quiet -i HOLDER1 -show_entries HOLDER2 -print_format json'
@@ -67,9 +68,6 @@ class BaseMetadata(object):
     def __init__(self, fsal, path):
         self.fsal = fsal
         self.path = to_unicode(path)
-
-    def get(self, key, default=None):
-        raise NotImplementedError()
 
 
 class FFmpegMetadataWrapper(BaseMetadata):
@@ -173,6 +171,25 @@ class AudioMetadata(FFmpegAudioVideoMetadata):
         self.genre = self.get_format_tag(('genre',))
         self.album = self.get_format_tag(('album',))
 
+
+class HtmlMetadata(BaseMetadata):
+    PARSER = 'html.parser'
+
+    def __init__(self, *args, **kwargs):
+        super(HtmlMetadata, self).__init__(*args, **kwargs)
+        self.data = {}
+        with self.fsal.open(self.path, 'r') as f:
+            parser = BeautifulSoup(f, self.PARSER,
+                                   parse_only=SoupStrainer('meta'))
+            for tag in parser:
+                if 'name' in tag.attrs:
+                    key = tag.attrs['name']
+                    value = tag.attrs['content']
+                    self.data[key] = value
+            parser.decompose()
+
+    def __getattr__(self, name):
+        return self.data.get(name, '')
 
 ImageMetadata = FFmpegImageMetadata
 
