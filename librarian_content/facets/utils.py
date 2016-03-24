@@ -11,7 +11,7 @@ from librarian_core.exts import ext_container as exts
 from librarian_core.utils import is_string
 
 from .facets import Facets
-from .archive import FacetsArchive, split_path
+from .archive import FacetsArchive
 from .processors import (get_facet_processors,
                          split_name,
                          is_html_file,
@@ -99,8 +99,7 @@ def generate_partial_facets(path, supervisor):
     if not success:
         return None
 
-    parent, name = split_path(path)
-    facets = {'path': parent, 'file': name}
+    facets = FacetsArchive.create_partial(path)
     for processor in get_facet_processors(path):
         processor.process_file(facets, path, partial=True)
     return Facets(supervisor, path, facets)

@@ -21,6 +21,7 @@ FACET_TYPES = {
     'image': 16,
 }
 
+
 class Facets(CDFObject):
     DATABASE_NAME = 'facets'
     TABLE_NAME = 'facets'

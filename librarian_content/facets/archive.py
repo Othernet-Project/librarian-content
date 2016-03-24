@@ -213,3 +213,8 @@ class FacetsArchive(object):
         master_keys = cls.FACET_TYPES_KEYS
         allowed_keys = master_keys['common'] + master_keys[facet_type]
         return filter_keys(facets, allowed_keys)
+
+    @classmethod
+    def create_partial(path):
+        parent, name = split_path(path)
+        return dict(path=parent, file=name, facet_types=1)
