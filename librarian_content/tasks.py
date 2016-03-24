@@ -6,8 +6,7 @@ from fsal.events import EVENT_CREATED, EVENT_DELETED, EVENT_MODIFIED
 
 from librarian_core.exts import ext_container as exts
 
-from .library.archive import Archive
-from .library.facets.archive import FacetsArchive
+from .facets.archive import FacetsArchive
 
 
 REPEAT_DELAY = 3  # seconds
@@ -48,10 +47,6 @@ def reschedule_content_check(fn):
 @reschedule_content_check
 def check_new_content(supervisor):
     config = supervisor.config
-    archive = Archive.setup(config['library.backend'],
-                            supervisor.exts.fsal,
-                            supervisor.exts.databases.content,
-                            meta_filenames=config['library.metadata'])
     facets_archive = FacetsArchive(supervisor.exts.fsal,
                                    supervisor.exts.databases.facets,
                                    config=config)
@@ -67,23 +62,7 @@ def check_new_content(supervisor):
             logging.info(u"Removing file from facets archive: '{}'".format(
                 fpath))
             facets_archive.remove_facets(fpath)
-
-        path = os.path.dirname(event.src)
-        if is_content(event, config['library.metadata']):
-            if event.event_type == 'created':
-                logging.info(u"New content has been discovered at: '{}'."
-                             " Adding it to the library...".format(path))
-                archive.add_to_archive(path)
-            elif event.event_type == 'deleted':
-                logging.info(u"Content removed from filesystem: '{}'."
-                             " Removing it from the library...".format(path))
-                archive.remove_from_archive(path, delete_files=False)
-
         supervisor.exts.events.publish('FS_EVENT', event)
-
-    if changes_found:
-        supervisor.exts.cache.invalidate('content')
-
     return changes_found
 
 
