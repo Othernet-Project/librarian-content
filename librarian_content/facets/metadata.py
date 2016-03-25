@@ -8,7 +8,7 @@ import functools
 import subprocess
 
 from bottle_utils.common import to_unicode
-from bs4 import BeautifulSoup, SoupStrainer
+from bs4 import BeautifulSoup
 
 
 FFPROBE_CMD = 'ffprobe -v quiet -i HOLDER1 -show_entries HOLDER2 -print_format json'
@@ -177,20 +177,38 @@ class HtmlMetadata(BaseMetadata):
 
     def __init__(self, *args, **kwargs):
         super(HtmlMetadata, self).__init__(*args, **kwargs)
+        success, fso = self.fsal.get_fso(self.path)
+        if not success:
+            msg = u'Error while extracting metadata: No such file: {}'.format(
+                self.path)
+            logging.error(msg)
+            raise IOError(msg)
+
         self.data = {}
-        with self.fsal.open(self.path, 'r') as f:
-            parser = BeautifulSoup(f, self.PARSER,
-                                   parse_only=SoupStrainer('meta'))
-            for tag in parser:
-                if 'name' in tag.attrs:
-                    key = tag.attrs['name']
-                    value = tag.attrs['content']
+        with open(fso.path, 'r') as f:
+            dom = BeautifulSoup(f, self.PARSER)
+            for meta in dom.find_all('meta'):
+                if 'name' in meta.attrs:
+                    key = meta.attrs['name']
+                    value = meta.attrs['content']
                     self.data[key] = value
-            parser.decompose()
+                # Old style html files may have the language set via
+                # <meta http-equiv="content-language">
+                pragma = meta.get('http-equiv', '').lower()
+                if pragma == 'content-language':
+                    self.data['language'] == meta.get('content')
+            if dom.html:
+                lang = dom.html.get('lang') or self.data.get('language', '')
+                self.data['language'] = lang
+            if dom.title:
+                self.data['title'] = dom.title.string
+            dom.decompose()
 
     def __getattr__(self, name):
         return self.data.get(name, '')
 
+
 ImageMetadata = FFmpegImageMetadata
+
 
 VideoMetadata = FFmpegAudioVideoMetadata
