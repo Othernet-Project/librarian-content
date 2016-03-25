@@ -66,7 +66,7 @@ def find_html_index(paths):
         if is_html_file(ext):
             first_html_file = first_html_file or fname
             for i, index_name in enumerate(HtmlFacetProcessor.INDEX_NAMES):
-                if name in index_name and i < best_html_index:
+                if name == index_name and i < best_html_index:
                     best_html_file = fname
                     best_html_index = i
     return best_html_file or first_html_file
