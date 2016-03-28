@@ -142,6 +142,12 @@ class FacetsArchive(object):
         return self.save_facets(facets)
 
     def remove_facets(self, path):
+        facets = self.get_facets(path)
+        if not facets:
+            return
+        processors = get_facet_processors(path)
+        for processor in processors:
+            processor.deprocess_file(facets, path)
         with self.db.transaction():
             parent, name = split_path(path)
             query = self.db.Delete(self.TABLE, where='path = %s and file = %s')

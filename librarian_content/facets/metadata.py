@@ -1,10 +1,13 @@
 from __future__ import unicode_literals
 
+import os
 import json
 import gevent
 import logging
 import datetime
+import urlparse
 import functools
+import itertools
 import subprocess
 
 from bottle_utils.common import to_unicode
@@ -172,6 +175,15 @@ class AudioMetadata(FFmpegAudioVideoMetadata):
         self.album = self.get_format_tag(('album',))
 
 
+def get_tag_attr(tags, attr):
+    return (tag[attr] for tag in tags if attr in tag.attrs)
+
+
+def is_local_file(dirpath, url):
+    result = urlparse.urlparse(url)
+    return result.scheme == ''
+
+
 class HtmlMetadata(BaseMetadata):
     PARSER = 'html.parser'
 
@@ -202,10 +214,25 @@ class HtmlMetadata(BaseMetadata):
                 self.data['language'] = lang
             if dom.title:
                 self.data['title'] = dom.title.string
+            self.extract_asset_paths(dom)
             dom.decompose()
 
     def __getattr__(self, name):
         return self.data.get(name, '')
+
+    def extract_asset_paths(self, dom):
+        self.assets = []
+        links = (
+            get_tag_attr(dom.find_all('link'), 'href'),
+            get_tag_attr(dom.find_all('script'), 'src'),
+            get_tag_attr(dom.find_all('img'), 'src'),
+            get_tag_attr(dom.find_all('a'), 'href'),
+        )
+        dirpath = os.path.dirname(self.path)
+        for url in itertools.chain(*links):
+            is_local = is_local_file(dirpath, url)
+            if is_local:
+                self.assets.append(url)
 
 
 ImageMetadata = FFmpegImageMetadata
