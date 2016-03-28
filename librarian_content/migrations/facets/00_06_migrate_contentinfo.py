@@ -12,6 +12,8 @@ from bs4 import BeautifulSoup
 
 from librarian_core.exts import ext_container
 
+from ...facets.utils import get_archive
+
 
 HTML_NAMES = ['index', 'main', 'start']
 HTML_EXTENSIONS = ['html', 'htm', 'xhtml']
@@ -99,7 +101,7 @@ def inject_meta(meta, html_path, encoding='utf-8'):
         html_out.write(raw_html)
 
 
-def meta2html(srcdir):
+def meta2html(srcdir, facets_archive):
     srcdir = os.path.abspath(srcdir)
     if not os.path.exists(srcdir):
         logging.info(u"Content directory: {} does not exist.".format(srcdir))
@@ -117,9 +119,11 @@ def meta2html(srcdir):
             continue  # no html file was found where results could be written
 
         inject_meta(meta, html_path)
+        facets_archive.update_facets(os.path.relpath(html_path, srcdir))
 
 
 def up(db, conf):
+    facets_archive = get_archive(db=db, config=conf)
     (success, base_paths) = ext_container.fsal.list_base_paths()
     for srcdir in base_paths:
-        meta2html(srcdir)
+        meta2html(srcdir, facets_archive)
