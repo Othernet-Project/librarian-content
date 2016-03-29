@@ -179,9 +179,14 @@ def get_tag_attr(tags, attr):
     return (tag[attr] for tag in tags if attr in tag.attrs)
 
 
-def is_local_file(dirpath, url):
+def get_local_path(dirpath, url):
     result = urlparse.urlparse(url)
-    return result.scheme == ''
+    is_local = result.scheme == ''
+    if is_local:
+        path = os.path.normpath(os.path.join(dirpath, url))
+    else:
+        path = None
+    return is_local, path
 
 
 class HtmlMetadata(BaseMetadata):
@@ -230,9 +235,9 @@ class HtmlMetadata(BaseMetadata):
         )
         dirpath = os.path.dirname(self.path)
         for url in itertools.chain(*links):
-            is_local = is_local_file(dirpath, url)
+            is_local, path = get_local_path(dirpath, url)
             if is_local:
-                self.assets.append(url)
+                self.assets.append(path)
 
 
 ImageMetadata = FFmpegImageMetadata
