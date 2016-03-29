@@ -2,6 +2,7 @@ import os
 
 from librarian_core.exts import ext_container as exts
 
+import links
 from .facets import FACET_TYPES
 from .metadata import (runnable, ImageMetadata, AudioMetadata,
                        VideoMetadata, HtmlMetadata)
@@ -50,6 +51,9 @@ class FacetProcessorBase(object):
         facets.update(meta)
         facets['facet_types'] |= FACET_TYPES[self.name]
         return True
+
+    def deprocess_file(self, facets, path):
+        pass
 
     def _get_metadata(self, path, partial):
         raise NotImplemented()
@@ -113,6 +117,10 @@ class GenericFacetProcessor(FacetProcessorBase):
     def _get_metadata(self, *args, **kwargs):
         return {}
 
+    @classmethod
+    def can_process(cls, path):
+        return True
+
 
 class HtmlFacetProcessor(FacetProcessorBase):
     name = 'html'
@@ -121,9 +129,20 @@ class HtmlFacetProcessor(FacetProcessorBase):
 
     INDEX_NAMES = ['index', 'main', 'start']
 
+    def process_file(self, facets, path, partial=False):
+        meta, assets = self._get_metadata(path, partial)
+        facets.update(meta)
+        facets['facet_types'] |= FACET_TYPES[self.name]
+
+        links.update_links(path, assets or (), clear=True)
+        return True
+
+    def deprocess_file(self, facets, path):
+        links.remove_links(path)
+
     def _get_metadata(self, path, partial):
         if partial:
-            return {}
+            return {}, None
         try:
             meta = HtmlMetadata(self.fsal, path)
             keys = ('author', 'title', 'description', 'keywords',
@@ -132,9 +151,9 @@ class HtmlFacetProcessor(FacetProcessorBase):
             for key in keys:
                 data[key] = getattr(meta, key)
             data['outernet_formatting'] = (meta.outernet_formatting == 'true')
-            return data
+            return data, meta.assets
         except IOError:
-            return {}
+            return {}, None
 
 
 class ImageFacetProcessor(FacetProcessorBase):

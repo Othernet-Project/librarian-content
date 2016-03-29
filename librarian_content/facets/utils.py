@@ -57,7 +57,7 @@ def get_facets(paths, partial=True, facet_type=None):
     return
 
 
-def find_html_index(paths):
+def find_html_index(paths, any_html=True):
     first_html_file = None
     best_html_file, best_html_index = (None, 10000)
     for path in paths:
@@ -69,7 +69,10 @@ def find_html_index(paths):
                 if name == index_name and i < best_html_index:
                     best_html_file = fname
                     best_html_index = i
-    return best_html_file or first_html_file
+    result = best_html_file
+    if not result and any_html:
+        result = first_html_file
+    return result
 
 
 def get_facet_types(paths):
