@@ -66,11 +66,15 @@ class FacetProcessorBase(object):
         return False
 
     @classmethod
-    def get_processor(cls, path):
+    def get_processors(cls, path):
+        processors = []
         for processor_cls in cls.subclasses():
             if processor_cls.can_process(path):
-                return processor_cls
-        raise RuntimeError("No processor found for the given type.")
+                processors.append(processor_cls)
+        if processors:
+            return processors
+        else:
+            raise RuntimeError("No processor found for the given type.")
 
     @classmethod
     def subclasses(cls, source=None):
