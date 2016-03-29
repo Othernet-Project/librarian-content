@@ -76,7 +76,6 @@ def update_links(source, targets=None, clear=True):
     Updates list of paths linked with ``source`` file. If ``clear`` is True,
     all previous links are cleared.
     """
-    with _get_db().transaction():
-        if clear:
-            remove_links(source)
-        add_links(source, targets)
+    if clear:
+        remove_links(source)
+    add_links(source, targets)
