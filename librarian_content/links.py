@@ -17,7 +17,13 @@ DELETE_PARTIAL_QUERY = Delete(TABLE_NAME, where='source = %s and target = %s')
 
 DELETE_ALL_QUERY = Delete(TABLE_NAME, where='source = %s')
 
-SELECT_QUERY = Select(sets=TABLE_NAME, what='target', where='source = %s')
+SELECT_TARGET_QUERY = Select(sets=TABLE_NAME,
+                             what='target',
+                             where='source = %s')
+
+SELECT_SOURCE_QUERY = Select(sets=TABLE_NAME,
+                             what='source',
+                             where='target = %s')
 
 
 def _get_db():
@@ -52,7 +58,17 @@ def get_links(source):
     Returns list of paths linked with ``source`` file.
     """
     db = _get_db()
-    return [row['target'] for row in db.fetchiter(SELECT_QUERY, (source,))]
+    return [row['target'] for row in db.fetchiter(
+        SELECT_TARGET_QUERY, (source,))]
+
+
+def get_sources(target):
+    """
+    Returns list of paths which are dependent on ``target`` file
+    """
+    db = _get_db()
+    return [row['source'] for row in db.fetchiter(
+        SELECT_SOURCE_QUERY, (target,))]
 
 
 def update_links(source, targets=None, clear=True):
