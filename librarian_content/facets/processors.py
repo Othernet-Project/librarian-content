@@ -117,6 +117,10 @@ class GenericFacetProcessor(FacetProcessorBase):
     def _get_metadata(self, *args, **kwargs):
         return {}
 
+    @classmethod
+    def can_process(cls, path):
+        return True
+
 
 class HtmlFacetProcessor(FacetProcessorBase):
     name = 'html'
