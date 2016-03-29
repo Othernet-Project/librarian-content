@@ -56,7 +56,7 @@ def check_new_content(supervisor):
         fpath = event.src
         is_file = not event.is_dir
         if is_file and event.event_type in (EVENT_CREATED, EVENT_MODIFIED):
-            logging.info(u"Update files facets: '{}'".format(fpath))
+            logging.info(u"Update file facets: '{}'".format(fpath))
             facets_archive.update_facets(fpath)
         elif is_file and event.event_type == EVENT_DELETED:
             logging.info(u"Removing file facets: '{}'".format(fpath))
@@ -83,8 +83,9 @@ def scan_facets(path_queue=None, step_delay=0, config=None):
 
     archive = get_archive(config=config)
     for f in files:
-        logging.info(u"Update file facets: '{}'".format(f.rel_path))
-        archive.update_facets(f.rel_path)
+        if not archive.get_facets(f.rel_path):
+            logging.info(u"Update file facets: '{}'".format(f.rel_path))
+            archive.update_facets(f.rel_path)
     path_queue.extend((d.rel_path for d in dirs))
 
     kwargs = dict(path_queue=path_queue, step_delay=step_delay,
