@@ -168,8 +168,9 @@ class FacetsArchive(object):
                                               terms=terms,
                                               facet_type=facet_type)
         terms = '%' + terms.lower() + '%'
-        return self.db.fetchiter(q, dict(terms=terms,
-                                         facet_type=facet_type_id))
+        params = dict(terms=terms, facet_type=facet_type_id)
+        results = self.db.fetchiter(q, params)
+        return (Facets(None, None, data=row) for row in results)
 
     def _generate_filter(self, q, terms=None, facet_type=None):
         if terms:
