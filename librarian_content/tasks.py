@@ -24,11 +24,9 @@ def is_content(event, meta_filenames):
 def reschedule_content_check(fn):
     @functools.wraps(fn)
     def wrapper(supervisor, current_delay):
+        changes_found = False
         try:
             changes_found = fn(supervisor)
-        except Exception:
-            changes_found = False
-            raise
         finally:
             if changes_found:
                 refresh_rate = REPEAT_DELAY
