@@ -65,7 +65,8 @@ class Facets(CDFObject):
         elif isinstance(other, Facets):
             self._data.update(other._data)
         else:
-            raise RuntimeError("Cannot update with type {}".format(type(other)))
+            raise RuntimeError(
+                "Cannot update with type {}".format(type(other)))
 
     def has_type(self, facet_type):
         if facet_type in FACET_TYPES:
