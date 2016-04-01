@@ -117,9 +117,9 @@ class FacetsArchive(object):
     def one(self, *args, **kwargs):
         return self.db.fetchone(*args, **kwargs)
 
-    @to_dict_list
     def many(self, *args, **kwargs):
-        return self.db.fetchall(*args, **kwargs)
+        rows = self.db.fetchall(*args, **kwargs)
+        return (AttrDict(zip(self.ALL_KEYS, r)) for r in rows)
 
     def get_facets(self, path, init=False, facet_type=None):
         parent, name = split_path(path)
@@ -131,6 +131,15 @@ class FacetsArchive(object):
             data = self.apply_key_filter(data, facet_type)
         if data:
             return Facets(supervisor=None, path=None, data=data)
+
+    def get_all_facets(self, dirpath, facet_type=None):
+        params = {'path': dirpath}
+        q = self.db.Select(sets=self.TABLE, where='path = %(path)s')
+        if facet_type:
+            q.where += 'facet_types = %(type)s'
+            params['type'] = facet_type
+        data = self.many(q, params)
+        return (Facets(supervisor=None, path=None, data=d) for d in data)
 
     def update_facets(self, path):
         processors = get_facet_processors(path)

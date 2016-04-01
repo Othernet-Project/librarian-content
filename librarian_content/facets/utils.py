@@ -18,6 +18,34 @@ from .processors import (get_facet_processors,
                          HtmlFacetProcessor)
 
 
+class IterLookup(object):
+    """
+    This object wraps an iterable, and returns an item with specified
+    characteristic while also creating a lookup table of items that were
+    missed speeding up lookups for those items the next time lookup is
+    performed.
+    """
+
+    def __init__(self, iterable, key=lambda x: x):
+        """
+        The ``key`` argument can be used to specify the lookup value. This
+        argument should be a function that takes an object and returns a value
+        that will be used in lookups.
+        """
+        self.iterable = ((key(i), i) for i in iterable)
+        self.lut = {}
+
+    def get(self, val):
+        if val in self.lut:
+            return self.lut[val]
+        for v, i in self.iterable:
+            self.lut[v] = i
+            if v == val:
+                return i
+        # The object was not found
+        raise KeyError('No object for key {}'.format(val))
+
+
 def to_list(func):
     """In case a single string parameter is passed to the function wrapped
     with this decorator, the single parameter will be wrapped in a list."""
@@ -54,7 +82,39 @@ def get_facets(paths, partial=True, facet_type=None):
     if schedule_paths:
         schedule_facets_generation(supervisor.config, paths=schedule_paths,
                                    archive=archive)
-    return
+
+
+def get_dir_facets(path, files, partial=False, facet_type=None):
+    """
+    Return facets for a specified directory path, and use the file list to
+    schedule facet generation when files are missing facets.
+
+    The ``files`` argument is expected to be an iterable of all files under the
+    specified path. Facets are not returned for any paths not found in this
+    iterable.
+    """
+    # TODO: Factor out duplication of code from get_facets()
+    supervisor = request.app.supervisor
+    archive = get_archive()
+    facets = archive.get_all_facets(path, facet_type)
+    facets = IterLookup(facets, key=lambda x: x['file'])
+    schedule_paths = []
+    for f in files:
+        try:
+            facet = facets.get(f)
+        except KeyError:
+            fpath = os.path.join(path, f)
+            logging.debug("Facets not found for '%s'."
+                          " Scheduling generation", fpath)
+            schedule_paths.append(path)
+            if partial:
+                facet = generate_partial_facets(fpath, supervisor)
+            else:
+                facet = {}
+        yield facet
+    if schedule_paths:
+        schedule_facets_generation(supervisor.config, paths=schedule_paths,
+                                   archive=archive)
 
 
 def find_html_index(paths, any_html=True):
